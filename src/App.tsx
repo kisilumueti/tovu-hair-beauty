@@ -1,171 +1,373 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
-  ArrowRight, ArrowUpRight, CalendarDays, ChevronDown,
-  Menu, Search, ShieldCheck, Sparkles, X,
+  ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, CalendarDays, Check,
+  ChevronDown, Clock3, Download, Heart, ImagePlus, LogOut, MapPin, Menu,
+  Plus, Search, ShieldCheck, SlidersHorizontal, Sparkles, Upload, UserRound,
+  Users, X,
 } from 'lucide-react';
+import { inspirationLooks } from './data';
+import { createId, exportDatabase, importDatabase, loadDatabase, saveDatabase } from './storage';
+import type { AccountRole, Booking, BookingStatus, Customer, Professional, Service, TovuDatabase } from './types';
 
-const serviceCategories = [
-  { number: '01', name: 'Hair styling', detail: 'Cuts, silk press, blowouts and more', icon: '✳' },
-  { number: '02', name: 'Braids & locs', detail: 'Protective styles, twists and loc care', icon: '〰' },
-  { number: '03', name: 'Nails & beauty', detail: 'Manicures, pedicures and finishing touches', icon: '◇' },
-  { number: '04', name: 'Makeup', detail: 'Everyday looks and special occasions', icon: '✧' },
-];
+type Page = 'home' | 'explore' | 'inspiration' | 'bookings' | 'dashboard';
+type Modal = 'account' | 'booking' | 'service' | null;
 
-const trustPoints = [
-  { icon: ShieldCheck, title: 'Professionals you can explore', text: 'Review profiles, services and portfolios before you decide.' },
-  { icon: CalendarDays, title: 'Appointments on your time', text: 'A clearer way to find a service and request a suitable time.' },
-  { icon: Sparkles, title: 'Your style, your choice', text: 'Discover the right beauty experience for your next moment.' },
-];
+const money = (amount: number) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(amount);
+const today = () => new Date().toISOString().slice(0, 10);
 
 function App() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [service, setService] = useState('All services');
-  const [location, setLocation] = useState('');
+  const [db, setDb] = useState<TovuDatabase>(() => loadDatabase());
+  const [page, setPage] = useState<Page>('home');
+  const [modal, setModal] = useState<Modal>(null);
+  const [currentUser, setCurrentUser] = useState<Customer | null>(() => {
+    try {
+      const id = localStorage.getItem('tovu.active.profile');
+      return id ? loadDatabase().customers.find((customer) => customer.id === id) ?? null : null;
+    } catch { return null; }
+  });
+  const [selectedProfessional, setSelectedProfessional] = useState<Professional | null>(null);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All services');
+  const [roleFilter, setRoleFilter] = useState('All providers');
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [showRegister, setShowRegister] = useState(false);
 
-  const closeMenu = () => setMobileOpen(false);
-  const startDiscovery = () => {
-    document.getElementById('discover')?.scrollIntoView({ behavior: 'smooth' });
-    closeMenu();
+  useEffect(() => { saveDatabase(db); }, [db]);
+
+  const providers = useMemo(() => db.professionals.filter((provider) => {
+    const matchesText = [provider.name, provider.businessName, provider.location, provider.bio, ...provider.services].join(' ').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLocation = provider.location.toLowerCase().includes(locationFilter.toLowerCase());
+    const matchesRole = roleFilter === 'All providers' || provider.role === roleFilter;
+    const matchesCategory = categoryFilter === 'All services' || provider.services.some((service) => service.toLowerCase().includes(categoryFilter.toLowerCase())) || db.services.some((service) => service.professionalId === provider.id && service.category === categoryFilter);
+    return matchesText && matchesLocation && matchesRole && matchesCategory;
+  }), [db.professionals, db.services, searchTerm, locationFilter, roleFilter, categoryFilter]);
+
+  const ownBookings = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'customer') return db.bookings.filter((booking) => booking.customerId === currentUser.id);
+    return db.bookings.filter((booking) => booking.professionalId === currentUser.id);
+  }, [currentUser, db.bookings]);
+
+  const ownProvider = currentUser && currentUser.role !== 'customer'
+    ? db.professionals.find((provider) => provider.id === currentUser.id) ?? null
+    : null;
+
+  const navigate = (next: Page) => {
+    setPage(next);
+    setMobileMenu(false);
+    setModal(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const notify = (message: string) => {
+    setNotice(message);
+    window.setTimeout(() => setNotice(''), 4200);
+  };
+
+  const openBooking = (provider: Professional, service?: Service) => {
+    setSelectedProfessional(provider);
+    setSelectedService(service ?? db.services.find((item) => item.professionalId === provider.id) ?? null);
+    setError('');
+    setModal('booking');
+  };
+
+  const handleRegister = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const role = String(form.get('role')) as AccountRole;
+    const name = String(form.get('name')).trim();
+    const email = String(form.get('email')).trim().toLowerCase();
+    const phone = String(form.get('phone')).trim();
+    const location = String(form.get('location')).trim();
+    const nationalId = String(form.get('nationalId') ?? '').trim();
+
+    if (!name || !email || !phone || !location) { setError('Complete all required fields.'); return; }
+    if (db.customers.some((customer) => customer.email === email)) { setError('An account with this email already exists in this browser.'); return; }
+    if (role !== 'customer' && !/^\d{7,8}$/.test(nationalId)) { setError('Enter a valid 7–8 digit Kenyan National ID number.'); return; }
+
+    const id = createId(role);
+    const customer: Customer = { id, name, email, phone, location, role, createdAt: new Date().toISOString() };
+    let nextDb: TovuDatabase = { ...db, customers: [...db.customers, customer] };
+
+    if (role !== 'customer') {
+      const businessName = String(form.get('businessName')).trim();
+      const bio = String(form.get('bio')).trim();
+      const provider: Professional = {
+        id, role, name, businessName: businessName || name, email, phone, location,
+        bio: bio || 'New TOVU professional. Profile information coming soon.',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+        cover: 'https://images.unsplash.com/photo-1600948836101-f9ffda59d250?auto=format&fit=crop&w=900&q=80',
+        services: [], priceFrom: 0, verified: false, createdAt: new Date().toISOString(), idProvided: true,
+      };
+      nextDb = { ...nextDb, professionals: [...nextDb.professionals, provider] };
+    }
+
+    // The ID is validated as a registration requirement but is deliberately not persisted in browser storage.
+    setDb(nextDb);
+    setCurrentUser(customer);
+    localStorage.setItem('tovu.active.profile', customer.id);
+    setError('');
+    setModal(null);
+    notify(role === 'customer' ? 'Your customer profile is ready.' : 'Your professional profile is registered. Add your first service in the dashboard.');
+    if (role === 'customer') navigate('bookings'); else navigate('dashboard');
+  };
+
+  const handleBooking = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedProfessional || !selectedService) { setError('Choose a service before booking.'); return; }
+    const form = new FormData(event.currentTarget);
+    const customerName = String(form.get('customerName')).trim();
+    const customerPhone = String(form.get('customerPhone')).trim();
+    const date = String(form.get('date'));
+    const time = String(form.get('time'));
+    if (!customerName || !customerPhone || !date || !time) { setError('Complete all booking details.'); return; }
+    if (date < today()) { setError('Choose a future date.'); return; }
+    const conflict = db.bookings.some((booking) => booking.professionalId === selectedProfessional.id && booking.date === date && booking.time === time && booking.status !== 'cancelled');
+    if (conflict) { setError('That time has already been requested. Please choose another slot.'); return; }
+
+    const booking: Booking = {
+      id: createId('booking'), customerId: currentUser?.id ?? 'guest',
+      customerName, customerPhone, professionalId: selectedProfessional.id,
+      professionalName: selectedProfessional.businessName, serviceId: selectedService.id,
+      serviceName: selectedService.name, date, time, price: selectedService.price,
+      notes: String(form.get('notes') ?? '').trim(), status: 'pending', createdAt: new Date().toISOString(),
+    };
+    setDb({ ...db, bookings: [booking, ...db.bookings] });
+    setModal(null);
+    setError('');
+    notify('Booking request saved. The provider must confirm it.');
+    navigate('bookings');
+  };
+
+  const updateBooking = (id: string, status: BookingStatus) => {
+    setDb({ ...db, bookings: db.bookings.map((booking) => booking.id === id ? { ...booking, status } : booking) });
+    notify(`Booking marked as ${status}.`);
+  };
+
+  const addService = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!ownProvider) return;
+    const form = new FormData(event.currentTarget);
+    const price = Number(form.get('price'));
+    const duration = Number(form.get('duration'));
+    const service: Service = {
+      id: createId('service'), professionalId: ownProvider.id,
+      name: String(form.get('name')).trim(), description: String(form.get('description')).trim(),
+      category: String(form.get('category')), price, durationMinutes: duration,
+    };
+    if (!service.name || !Number.isFinite(price) || price < 0 || !Number.isFinite(duration) || duration < 15) { setError('Enter a service name, valid price and duration of at least 15 minutes.'); return; }
+    setDb({ ...db, services: [...db.services, service], professionals: db.professionals.map((provider) => provider.id === ownProvider.id ? { ...provider, services: [...provider.services, service.name], priceFrom: provider.priceFrom ? Math.min(provider.priceFrom, price) : price } : provider) });
+    setModal(null);
+    setError('');
+    notify('Your service has been published to this browser catalogue.');
+  };
+
+  const signOut = () => {
+    localStorage.removeItem('tovu.active.profile');
+    setCurrentUser(null);
+    navigate('home');
+    notify('You have signed out of this local preview.');
+  };
+
+  const handleImport = async (event: FormEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+    try {
+      const imported = await importDatabase(file);
+      setDb(imported);
+      setCurrentUser(null);
+      localStorage.removeItem('tovu.active.profile');
+      notify('TOVU JSON backup imported successfully.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not import this backup.');
+    }
+    event.currentTarget.value = '';
+  };
+
+  const statusClass = (status: BookingStatus) => `status-pill status-${status}`;
+
   return (
-    <main>
-      <div className="announcement">
-        <span className="announcement-dot" />
-        A new way to find your beauty professional.
-        <a href="#discover">Discover TOVU <ArrowUpRight size={13} /></a>
-      </div>
-
-      <header className="site-header">
-        <a className="brand" href="#home" aria-label="TOVU home">
-          <span className="brand-mark">T</span>
-          <span className="brand-name">TOVU<span>.</span></span>
-        </a>
-
-        <nav className={mobileOpen ? 'main-nav open' : 'main-nav'} aria-label="Main navigation">
-          <a href="#discover" onClick={closeMenu}>Discover</a>
-          <a href="#services" onClick={closeMenu}>Services</a>
-          <a href="#how-it-works" onClick={closeMenu}>How it works</a>
-          <a href="#professionals" onClick={closeMenu}>For professionals</a>
-          <div className="mobile-nav-actions">
-            <button className="button button-outline" onClick={startDiscovery}>Explore services</button>
-          </div>
+    <div className="tovu-app">
+      <div className="top-ribbon"><span className="ribbon-dot" /> THE TOVU PREVIEW EXPERIENCE <span className="ribbon-divider">·</span> DISCOVER YOUR NEXT LOOK</div>
+      <header className="app-header">
+        <button className="wordmark" onClick={() => navigate('home')} aria-label="TOVU home"><span className="wordmark-icon">T</span><span>TOVU<span className="wordmark-period">.</span></span></button>
+        <nav className={mobileMenu ? 'app-nav app-nav-open' : 'app-nav'} aria-label="Main navigation">
+          <button className={page === 'explore' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('explore')}>Find a professional</button>
+          <button className={page === 'inspiration' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('inspiration')}>Style inspiration</button>
+          <button className={page === 'bookings' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('bookings')}>My bookings</button>
+          {currentUser && currentUser.role !== 'customer' && <button className={page === 'dashboard' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('dashboard')}>Business studio</button>}
         </nav>
-
-        <div className="header-actions">
-          <a className="sign-in" href="mailto:hello@tovu.co.ke?subject=TOVU%20early%20access">Get in touch</a>
-          <button className="button button-dark header-cta" onClick={startDiscovery}>Find your style <ArrowUpRight size={15} /></button>
+        <div className="header-controls">
+          {currentUser ? <button className="profile-chip" onClick={() => navigate(currentUser.role === 'customer' ? 'bookings' : 'dashboard')}><span className="profile-avatar">{currentUser.name.slice(0, 1).toUpperCase()}</span><span>{currentUser.name.split(' ')[0]}</span><ChevronDown size={14} /></button> : <button className="button button-quiet" onClick={() => { setModal('account'); setShowRegister(true); }}>Sign in / Join</button>}
+          <button className="button button-ink header-join" onClick={() => { setModal('account'); setShowRegister(true); }}>Join TOVU <ArrowUpRight size={15} /></button>
         </div>
-        <button className="menu-toggle" aria-label={mobileOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}>
-          {mobileOpen ? <X /> : <Menu />}
-        </button>
+        <button className="mobile-menu-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation">{mobileMenu ? <X /> : <Menu />}</button>
       </header>
 
-      <section className="hero" id="home">
-        <div className="hero-copy">
-          <div className="eyebrow"><span /> THE BEAUTY EXPERIENCE, REIMAGINED</div>
-          <h1>Your next look<br />starts <em>here.</em></h1>
-          <p className="hero-description">Good hair days should be easier to find. Discover talented beauty professionals, explore their work, and make room for a little more you.</p>
-          <div className="hero-actions">
-            <button className="button button-dark button-large" onClick={startDiscovery}>Explore services <ArrowRight size={17} /></button>
-            <a className="text-link" href="#how-it-works">How TOVU works <ArrowUpRight size={15} /></a>
-          </div>
-          <div className="hero-note">
-            <div className="note-icon"><Sparkles size={17} /></div>
-            <div><strong>A more thoughtful way to book.</strong><span>Made around your time, taste and style.</span></div>
-          </div>
-        </div>
-        <div className="hero-visual" aria-label="Editorial beauty photography">
-          <div className="hero-image" />
-          <div className="image-caption"><span>THE ART OF YOUR EVERYDAY</span><span>01 / 04</span></div>
-          <div className="floating-card">
-            <span className="floating-icon"><CalendarDays size={18} /></span>
-            <div><strong>Your time, beautifully spent.</strong><span>Discover. Choose. Connect.</span></div>
-            <ArrowUpRight size={17} />
-          </div>
-          <div className="vertical-label">BEAUTY, ON YOUR TERMS</div>
-        </div>
-        <div className="hero-bottomline"><span>NAIROBI · KENYA</span><span>FIND YOUR FEEL-GOOD</span><span>SCROLL TO EXPLORE ↓</span></div>
-      </section>
+      {notice && <div className="toast"><Check size={16} />{notice}<button onClick={() => setNotice('')} aria-label="Dismiss"><X size={14} /></button></div>}
+      {error && !modal && <div className="global-error"><span>{error}</span><button onClick={() => setError('')}><X size={14} /></button></div>}
 
-      <section className="discover-section section-pad" id="discover">
-        <div className="section-heading">
-          <div><div className="eyebrow"><span /> YOUR SEARCH STARTS HERE</div><h2>Find the feeling.<br /><em>Find your people.</em></h2></div>
-          <p>Whether you know exactly what you want or you're ready for something new, your next beauty experience is a few steps away.</p>
-        </div>
-        <div className="search-panel">
-          <div className="search-field service-select">
-            <label htmlFor="service-select">I'M LOOKING FOR</label>
-            <div className="select-wrap"><Sparkles size={17} /><select id="service-select" value={service} onChange={(event) => setService(event.target.value)}><option>All services</option><option>Hair styling</option><option>Braids & locs</option><option>Nails & beauty</option><option>Makeup</option></select><ChevronDown size={15} /></div>
-          </div>
-          <div className="search-divider" />
-          <div className="search-field location-field">
-            <label htmlFor="location-input">MY LOCATION</label>
-            <div className="select-wrap"><Search size={17} /><input id="location-input" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Enter a town or neighbourhood" /></div>
-          </div>
-          <button className="button button-dark search-button" onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}>Explore <ArrowRight size={17} /></button>
-        </div>
-        <p className="search-disclaimer">Discovery is being built. Search selections are not yet connected to live salon listings.</p>
-      </section>
+      {page === 'home' && (
+        <>
+          <section className="market-hero">
+            <div className="hero-grain" />
+            <div className="market-hero-copy">
+              <div className="overline"><span /> THE ART OF LOOKING LIKE YOU</div>
+              <h1>Find your look.<br /><em>Love your moment.</em></h1>
+              <p>Discover exceptional hair and beauty professionals around you. Explore the work, choose your service, and make your next appointment feel effortless.</p>
+              <div className="hero-cta-row"><button className="button button-gold" onClick={() => navigate('explore')}>Explore professionals <ArrowRight size={16} /></button><button className="button button-outline-light" onClick={() => navigate('inspiration')}>Explore style ideas <Sparkles size={15} /></button></div>
+              <div className="hero-microcopy"><span><ShieldCheck size={15} /> Profiles and services in one place</span><span><CalendarDays size={15} /> Appointment requests made simple</span></div>
+            </div>
+            <div className="hero-photo-wrap"><img src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1200&q=90" alt="Editorial hair styling inspiration" /><div className="hero-photo-label"><span>THE BEAUTY EDIT</span><span>01 — 06</span></div><div className="hero-photo-stamp">YOUR<br /><i>moment</i><br />starts here</div></div>
+            <div className="hero-foot"><span>NAIROBI · KENYA</span><span>BEAUTY, ON YOUR TERMS</span><button onClick={() => navigate('explore')}>SCROLL TO DISCOVER ↓</button></div>
+          </section>
 
-      <section className="services-section section-pad" id="services">
-        <div className="section-heading compact">
-          <div><div className="eyebrow"><span /> EXPLORE THE POSSIBILITIES</div><h2>Whatever your style,<br /><em>there's a place for it.</em></h2></div>
-          <a className="text-link" href="#professionals">For beauty professionals <ArrowUpRight size={15} /></a>
-        </div>
-        <div className="service-grid">
-          {serviceCategories.map((item) => (
-            <motion.button className="service-card" key={item.number} whileHover={{ y: -5 }} onClick={() => { setService(item.name); document.getElementById('discover')?.scrollIntoView({ behavior: 'smooth' }); }}>
-              <span className="service-number">{item.number}</span>
-              <span className="service-symbol">{item.icon}</span>
-              <span className="service-card-bottom"><strong>{item.name}</strong><small>{item.detail}</small><span className="service-arrow"><ArrowUpRight size={18} /></span></span>
-            </motion.button>
-          ))}
-        </div>
-      </section>
+          <section className="quick-search section-shell">
+            <div className="quick-search-intro"><span className="eyebrow">A BETTER BEAUTY SEARCH</span><h2>What are we<br /><em>booking today?</em></h2></div>
+            <div className="quick-search-controls">
+              <label><span>SERVICE</span><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All services</option><option>Hair styling</option><option>Braids & locs</option><option>Hair care</option><option>Makeup</option><option>Nails & beauty</option></select></label>
+              <label><span>LOCATION</span><input value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} placeholder="e.g. Kilimani, Nairobi" /></label>
+              <button className="button button-ink" onClick={() => navigate('explore')}>Search <Search size={16} /></button>
+            </div>
+          </section>
 
-      <section className="manifesto" id="how-it-works">
-        <div className="manifesto-image" role="img" aria-label="Warm editorial beauty studio interior" />
-        <div className="manifesto-copy">
-          <div className="eyebrow light"><span /> A LITTLE MORE YOU</div>
-          <h2>Beauty is personal.<br /><em>Finding it should be simple.</em></h2>
-          <p>TOVU is being created to bring discovery and booking into one considered experience. Less guesswork, more confidence, and more time for the things that make you feel like yourself.</p>
-          <a href="#discover" className="button button-light">Explore the experience <ArrowRight size={16} /></a>
-        </div>
-      </section>
+          <section className="section-shell feature-section">
+            <div className="section-heading"><div><span className="eyebrow">THE TOVU DISCOVERY EDIT</span><h2>Find the right hands<br /><em>for your next look.</em></h2></div><button className="text-link" onClick={() => navigate('explore')}>View all professionals <ArrowUpRight size={15} /></button></div>
+            <div className="provider-grid">
+              {db.professionals.slice(0, 3).map((provider) => <ProviderCard key={provider.id} provider={provider} services={db.services.filter((service) => service.professionalId === provider.id)} onBook={openBooking} onOpen={() => { setSelectedProfessional(provider); navigate('explore'); }} />)}
+            </div>
+          </section>
 
-      <section className="benefits-section section-pad" id="professionals">
-        <div className="section-heading compact">
-          <div><div className="eyebrow"><span /> THE TOVU DIFFERENCE</div><h2>Made for the way<br /><em>you do beauty.</em></h2></div>
-          <p>A thoughtful experience for customers and the talented people behind every great look.</p>
-        </div>
-        <div className="benefit-grid">
-          {trustPoints.map(({ icon: Icon, title, text }, index) => (
-            <article className="benefit-card" key={title}><span className="benefit-index">0{index + 1}</span><Icon size={23} strokeWidth={1.5} /><h3>{title}</h3><p>{text}</p></article>
-          ))}
-        </div>
-        <div className="professional-banner">
-          <div><span className="eyebrow">FOR STYLISTS & SALONS</span><h3>Your talent deserves<br /><em>to be discovered.</em></h3><p>We're shaping a better digital home for beauty professionals.</p></div>
-          <a className="button button-dark" href="mailto:hello@tovu.co.ke?subject=I%20want%20to%20join%20TOVU">Join the conversation <ArrowUpRight size={16} /></a>
-        </div>
-      </section>
+          <section className="inspiration-band">
+            <div className="inspiration-band-copy"><span className="eyebrow light-eyebrow">A LITTLE INSPIRATION</span><h2>Save the look.<br /><em>Make it yours.</em></h2><p>Explore ideas for your next appointment, then find a professional who can help bring your vision to life.</p><button className="button button-gold" onClick={() => navigate('inspiration')}>Explore the style gallery <ArrowRight size={16} /></button></div>
+            <div className="inspiration-mini-grid">{inspirationLooks.slice(0, 3).map((look) => <button key={look.id} onClick={() => navigate('inspiration')}><img src={look.image} alt={look.title} /><span>{look.title}</span></button>)}</div>
+          </section>
 
-      <section className="closing-cta">
-        <div className="eyebrow light"><span /> THE NEXT CHAPTER OF BEAUTY</div>
-        <h2>Make time for<br /><em>feeling like you.</em></h2>
-        <a className="button button-light button-large" href="mailto:hello@tovu.co.ke?subject=TOVU%20early%20access">Stay connected <ArrowUpRight size={17} /></a>
-        <span className="closing-sparkle">✳</span>
-      </section>
+          <section className="how-section section-shell">
+            <div className="section-heading"><div><span className="eyebrow">A SIMPLE WAY TO FEEL YOUR BEST</span><h2>Three steps.<br /><em>One lovely experience.</em></h2></div><p>From inspiration to appointment, TOVU brings your beauty journey into one place.</p></div>
+            <div className="steps-grid"><article><span>01</span><Search /><h3>Discover</h3><p>Explore professionals, services, locations and style inspiration.</p></article><article><span>02</span><CalendarDays /><h3>Choose your moment</h3><p>Select a service, request a date and time, and share your preferences.</p></article><article><span>03</span><Heart /><h3>Enjoy your look</h3><p>Keep your appointment details together and return whenever you're ready.</p></article></div>
+          </section>
 
-      <footer className="site-footer">
-        <a className="brand footer-brand" href="#home"><span className="brand-mark">T</span><span className="brand-name">TOVU<span>.</span></span></a>
-        <span className="footer-tagline">Your hair. Your style. Your moment.</span>
-        <div className="footer-links"><a href="#discover">Discover</a><a href="#services">Services</a><a href="#professionals">For professionals</a><a href="mailto:hello@tovu.co.ke">Contact</a></div>
-        <span className="copyright">© {new Date().getFullYear()} TOVU. All rights reserved.</span>
-      </footer>
-    </main>
+          <section className="professional-callout"><div><span className="eyebrow">FOR STYLISTS & SALON OWNERS</span><h2>Your craft deserves<br /><em>a beautiful stage.</em></h2><p>Create a professional profile, publish services and start receiving appointment requests.</p></div><button className="button button-ink" onClick={() => { setModal('account'); setShowRegister(true); }}>Register your business <ArrowUpRight size={16} /></button></section>
+          <Footer onNavigate={navigate} />
+        </>
+      )}
+
+      {page === 'explore' && (
+        <main className="page-shell">
+          <div className="page-intro"><span className="eyebrow">THE TOVU DIRECTORY</span><h1>Meet your next<br /><em>beauty professional.</em></h1><p>Explore the directory, compare services and find a professional whose work feels right for you.</p></div>
+          <div className="directory-toolbar"><div className="directory-search"><Search size={17} /><input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search names, services or locations" /></div><div className="filter-control"><SlidersHorizontal size={15} /><select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}><option>All providers</option><option value="stylist">Independent stylists</option><option value="salon">Salons</option></select></div><select className="filter-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All services</option><option>Hair styling</option><option>Braids & locs</option><option>Hair care</option><option>Makeup</option><option>Nails & beauty</option></select><input className="location-filter" value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} placeholder="Location" /></div>
+          <div className="directory-meta"><span>{providers.length} {providers.length === 1 ? 'professional' : 'professionals'} found</span><span>Preview directory · listings marked as sample are illustrative</span></div>
+          {providers.length ? <div className="provider-grid directory-grid">{providers.map((provider) => <ProviderCard key={provider.id} provider={provider} services={db.services.filter((service) => service.professionalId === provider.id)} onBook={openBooking} onOpen={() => setSelectedProfessional(provider)} />)}</div> : <EmptyState title="No professionals found" text="Try a different search term, service or location." action="Clear filters" onAction={() => { setSearchTerm(''); setLocationFilter(''); setCategoryFilter('All services'); setRoleFilter('All providers'); }} />}
+          {selectedProfessional && <div className="profile-detail"><button className="close-detail" onClick={() => setSelectedProfessional(null)}><X size={16} /></button><img src={selectedProfessional.cover} alt="" /><div><span className="eyebrow">PROFESSIONAL PROFILE</span><h2>{selectedProfessional.businessName}</h2><p>{selectedProfessional.bio}</p><p className="detail-location"><MapPin size={14} />{selectedProfessional.location}</p><div className="detail-services">{db.services.filter((service) => service.professionalId === selectedProfessional.id).map((service) => <button key={service.id} onClick={() => openBooking(selectedProfessional, service)}><span><strong>{service.name}</strong><small>{service.durationMinutes} min</small></span><b>{money(service.price)}</b><ArrowUpRight size={15} /></button>)}</div></div></div>}
+        </main>
+      )}
+
+      {page === 'inspiration' && (
+        <main className="page-shell">
+          <div className="page-intro"><span className="eyebrow">THE TOVU STYLE JOURNAL</span><h1>A moodboard for<br /><em>your next moment.</em></h1><p>Browse editorial hairstyle and beauty ideas. These images are inspiration references, not portfolios or work samples from registered TOVU professionals.</p></div>
+          <div className="inspiration-grid">{inspirationLooks.map((look, index) => <article className={index % 3 === 0 ? 'look-card look-tall' : 'look-card'} key={look.id}><div className="look-image"><img src={look.image} alt={look.title} loading="lazy" /><span className="look-category">{look.category}</span><button aria-label={`Book a style like ${look.title}`} onClick={() => { setSearchTerm(look.category); setCategoryFilter(look.category === 'Braids' ? 'Braids & locs' : 'All services'); navigate('explore'); }}><ArrowUpRight size={17} /></button></div><div className="look-caption"><div><h3>{look.title}</h3><p>{look.note}</p></div><span>0{index + 1}</span></div></article>)}</div>
+          <div className="inspiration-note"><Sparkles size={18} /><p>Found your look? Explore the TOVU directory to discover a professional and request an appointment.</p><button className="button button-ink" onClick={() => navigate('explore')}>Find a professional <ArrowRight size={15} /></button></div>
+        </main>
+      )}
+
+      {page === 'bookings' && (
+        <main className="page-shell">
+          <div className="page-intro dashboard-intro"><span className="eyebrow">YOUR TOVU SPACE</span><h1>{currentUser ? 'Your appointments.' : 'Your next appointment.'}<br /><em>All in one place.</em></h1><p>{currentUser ? `Welcome back, ${currentUser.name}. Here are the appointments connected to this local profile.` : 'You can request a booking without creating an account. Register to keep a local customer profile and view your bookings here.'}</p></div>
+          {!currentUser && <div className="account-prompt"><UserRound size={21} /><div><strong>Want to keep track of your appointments?</strong><p>Create a customer profile on this device to keep your booking history together.</p></div><button className="button button-ink" onClick={() => { setModal('account'); setShowRegister(true); }}>Create profile</button></div>}
+          <div className="booking-list">{ownBookings.length ? ownBookings.map((booking) => <BookingRow key={booking.id} booking={booking} onUpdate={updateBooking} customerView={currentUser?.role === 'customer'} />) : <EmptyState title="No appointments yet" text="Your booking requests will appear here after you choose a professional and service." action="Explore professionals" onAction={() => navigate('explore')} />}</div>
+          {db.bookings.some((booking) => booking.customerId === 'guest') && <p className="local-note">Guest booking requests are stored on this browser. Create a profile before your next booking to associate future appointments with your account.</p>}
+        </main>
+      )}
+
+      {page === 'dashboard' && (
+        <main className="page-shell">
+          {!ownProvider ? <div className="empty-state"><UserRound size={28} /><h2>Professional studio</h2><p>Register as a stylist or salon to access your business workspace.</p><button className="button button-ink" onClick={() => { setModal('account'); setShowRegister(true); }}>Register as a professional</button></div> : <>
+            <div className="dashboard-welcome"><div><span className="eyebrow">TOVU BUSINESS STUDIO</span><h1>Welcome, <em>{ownProvider.businessName}.</em></h1><p>Manage your services and appointment requests from one workspace.</p></div><button className="button button-outline-dark" onClick={() => setModal('service')}><Plus size={16} /> Add a service</button></div>
+            <div className="stats-grid"><div><span>TOTAL REQUESTS</span><strong>{ownBookings.length}</strong><small>All booking statuses</small></div><div><span>PENDING</span><strong>{ownBookings.filter((booking) => booking.status === 'pending').length}</strong><small>Awaiting your response</small></div><div><span>CONFIRMED</span><strong>{ownBookings.filter((booking) => booking.status === 'confirmed').length}</strong><small>Upcoming appointments</small></div><div><span>LIVE SERVICES</span><strong>{db.services.filter((service) => service.professionalId === ownProvider.id).length}</strong><small>Your catalogue</small></div></div>
+            <section className="dashboard-panel"><div className="panel-heading"><div><span className="eyebrow">YOUR CATALOGUE</span><h2>Services & pricing</h2></div><button className="button button-quiet" onClick={() => setModal('service')}><Plus size={15} /> Add service</button></div>
+              {db.services.filter((service) => service.professionalId === ownProvider.id).length ? <div className="service-manage-list">{db.services.filter((service) => service.professionalId === ownProvider.id).map((service) => <div key={service.id}><div><strong>{service.name}</strong><span>{service.category} · {service.durationMinutes} minutes</span></div><b>{money(service.price)}</b></div>)}</div> : <EmptyState title="Your catalogue is ready for its first service" text="Add a service so customers can understand what you offer and request an appointment." action="Add your first service" onAction={() => setModal('service')} />}
+            </section>
+            <section className="dashboard-panel"><div className="panel-heading"><div><span className="eyebrow">CLIENT MANAGEMENT</span><h2>Appointment requests</h2></div><span className="panel-count">{ownBookings.length} total</span></div>
+              {ownBookings.length ? <div className="booking-list compact-bookings">{ownBookings.map((booking) => <BookingRow key={booking.id} booking={booking} onUpdate={updateBooking} customerView={false} />)}</div> : <EmptyState title="No appointment requests yet" text="When customers request your services, they will appear here." />}
+            </section>
+            <section className="dashboard-panel profile-settings"><div className="panel-heading"><div><span className="eyebrow">PUBLIC PROFILE</span><h2>Business details</h2></div><span className="status-pill status-pending">ID supplied · Not verified</span></div><p>{ownProvider.bio}</p><p><MapPin size={14} /> {ownProvider.location}</p><p><ShieldCheck size={14} /> ID number was required at registration but is not retained in this browser preview. Identity and professional verification are not performed here.</p></section>
+          </>}
+        </main>
+      )}
+
+      {page !== 'home' && <Footer onNavigate={navigate} />}
+
+      {modal === 'account' && <ModalShell title={showRegister ? 'Create your TOVU profile' : 'Welcome to TOVU'} subtitle="Set up a local preview profile to explore the customer or professional experience." onClose={() => { setModal(null); setError(''); }}>
+        <form className="form-stack" onSubmit={handleRegister}>
+          <div className="form-callout"><ShieldCheck size={18} /><span>This preview stores profile details in this browser only. It does not create a secure online account.</span></div>
+          <label>ACCOUNT TYPE<select name="role" defaultValue="customer"><option value="customer">Customer</option><option value="stylist">Independent stylist</option><option value="salon">Salon / beauty business</option></select></label>
+          <label>FULL NAME<input name="name" required placeholder="Your full name" /></label>
+          <label>EMAIL ADDRESS<input name="email" type="email" required placeholder="you@example.com" /></label>
+          <div className="form-two"><label>PHONE NUMBER<input name="phone" type="tel" required placeholder="+254 7XX XXX XXX" /></label><label>LOCATION<input name="location" required placeholder="Town / neighbourhood" /></label></div>
+          <label>BUSINESS / STUDIO NAME <span className="optional-label">For professionals</span><input name="businessName" placeholder="Your salon or studio name" /></label>
+          <label>ABOUT YOUR WORK <span className="optional-label">For professionals</span><textarea name="bio" rows={3} placeholder="Tell customers about your services and experience." /></label>
+          <label>NATIONAL ID NUMBER <span className="required-label">Required for stylist and salon registration</span><input name="nationalId" inputMode="numeric" pattern="[0-9]{7,8}" maxLength={8} placeholder="7–8 digit Kenyan ID number" /><small className="field-help">The number is checked for format and immediately discarded. It is not saved. This preview does not verify identity or qualifications.</small></label>
+          {error && <p className="form-error">{error}</p>}
+          <button className="button button-ink button-full" type="submit">Create local profile <ArrowRight size={16} /></button>
+          <p className="form-footnote">By continuing, you understand this is a browser-based product preview, not a live identity or authentication service.</p>
+        </form>
+      </ModalShell>}
+
+      {modal === 'booking' && selectedProfessional && selectedService && <ModalShell title="Request an appointment" subtitle={`Booking with ${selectedProfessional.businessName}`} onClose={() => { setModal(null); setError(''); }}>
+        <form className="form-stack" onSubmit={handleBooking}>
+          <div className="booking-service-summary"><img src={selectedProfessional.avatar} alt="" /><div><strong>{selectedService.name}</strong><span>{selectedProfessional.businessName} · {selectedProfessional.location}</span><small>{selectedService.durationMinutes} minutes</small></div><b>{money(selectedService.price)}</b></div>
+          <label>YOUR NAME<input name="customerName" required defaultValue={currentUser?.name ?? ''} placeholder="Full name" /></label>
+          <label>PHONE NUMBER<input name="customerPhone" required defaultValue={currentUser?.phone ?? ''} placeholder="+254 7XX XXX XXX" /></label>
+          <div className="form-two"><label>DATE<input name="date" type="date" min={today()} required /></label><label>TIME<select name="time" required defaultValue=""><option value="" disabled>Select a time</option>{['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00'].map((time) => <option key={time}>{time}</option>)}</select></label></div>
+          <label>NOTES FOR THE PROFESSIONAL<textarea name="notes" rows={3} placeholder="Share preferences, hair length, inspiration or other details." /></label>
+          <div className="form-callout"><CalendarDays size={18} /><span>This creates a pending request in this browser. The professional must confirm it. No payment is taken in this preview.</span></div>
+          {error && <p className="form-error">{error}</p>}
+          <button className="button button-ink button-full" type="submit">Send booking request <ArrowRight size={16} /></button>
+        </form>
+      </ModalShell>}
+
+      {modal === 'service' && <ModalShell title="Publish a service" subtitle="Add a service to your professional catalogue." onClose={() => { setModal(null); setError(''); }}>
+        <form className="form-stack" onSubmit={addService}>
+          <label>SERVICE NAME<input name="name" required placeholder="e.g. Knotless braids" /></label>
+          <label>CATEGORY<select name="category"><option>Hair styling</option><option>Braids & locs</option><option>Hair care</option><option>Makeup</option><option>Nails & beauty</option></select></label>
+          <label>DESCRIPTION<textarea name="description" rows={3} required placeholder="Describe what's included in this service." /></label>
+          <div className="form-two"><label>PRICE (KES)<input name="price" type="number" min="0" step="50" required placeholder="2500" /></label><label>DURATION (MINUTES)<input name="duration" type="number" min="15" step="15" required placeholder="90" /></label></div>
+          {error && <p className="form-error">{error}</p>}
+          <button className="button button-ink button-full" type="submit">Publish service <Check size={16} /></button>
+        </form>
+      </ModalShell>}
+
+      <div className="data-tools"><button onClick={() => exportDatabase(db)} title="Download a JSON backup"><Download size={14} /> Export JSON</button><label title="Restore a TOVU JSON backup"><Upload size={14} /> Import JSON<input type="file" accept="application/json,.json" onChange={handleImport} /></label></div>
+    </div>
   );
+}
+
+function ProviderCard({ provider, services, onBook, onOpen }: { provider: Professional; services: Service[]; onBook: (provider: Professional, service?: Service) => void; onOpen: () => void }) {
+  return <article className="provider-card">
+    <button className="provider-cover" onClick={onOpen}><img src={provider.cover} alt={`Editorial image for ${provider.businessName}`} loading="lazy" /><span className="sample-tag">PREVIEW LISTING</span><span className="provider-type">{provider.role === 'salon' ? 'SALON' : 'INDEPENDENT STYLIST'}</span></button>
+    <div className="provider-info"><div className="provider-heading"><div><h3>{provider.businessName}</h3><span>{provider.name}</span></div><span className="provider-avatar"><img src={provider.avatar} alt="" /></span></div><p className="provider-location"><MapPin size={13} />{provider.location}</p><p className="provider-bio">{provider.bio}</p><div className="provider-tags">{provider.services.slice(0, 3).map((service) => <span key={service}>{service}</span>)}</div><div className="provider-card-footer"><span>From <strong>{provider.priceFrom ? money(provider.priceFrom) : 'Set your prices'}</strong></span>{services.length ? <button onClick={() => onBook(provider, services[0])}>Book now <ArrowUpRight size={14} /></button> : <button onClick={onOpen}>View profile <ArrowUpRight size={14} /></button>}</div></div>
+  </article>;
+}
+
+function BookingRow({ booking, onUpdate, customerView }: { booking: Booking; onUpdate: (id: string, status: BookingStatus) => void; customerView: boolean }) {
+  return <article className="booking-row"><div className="booking-date"><strong>{new Date(`${booking.date}T00:00:00`).toLocaleDateString('en-KE', { day: '2-digit' })}</strong><span>{new Date(`${booking.date}T00:00:00`).toLocaleDateString('en-KE', { month: 'short' })}</span></div><div className="booking-main"><strong>{booking.serviceName}</strong><span>{customerView ? booking.professionalName : booking.customerName} · {booking.date} at {booking.time}</span><small>{booking.customerPhone}</small>{booking.notes && <small>Note: {booking.notes}</small>}</div><div className="booking-actions"><b>{money(booking.price)}</b><span className={`status-pill status-${booking.status}`}>{booking.status}</span>{!customerView && booking.status === 'pending' && <div><button onClick={() => onUpdate(booking.id, 'confirmed')}>Confirm</button><button onClick={() => onUpdate(booking.id, 'cancelled')}>Decline</button></div>}{!customerView && booking.status === 'confirmed' && <button onClick={() => onUpdate(booking.id, 'completed')}>Mark completed</button>}</div></article>;
+}
+
+function EmptyState({ title, text, action, onAction }: { title: string; text: string; action?: string; onAction?: () => void }) {
+  return <div className="empty-state"><CalendarDays size={27} /><h2>{title}</h2><p>{text}</p>{action && onAction && <button className="button button-ink" onClick={onAction}>{action} <ArrowRight size={15} /></button>}</div>;
+}
+
+function ModalShell({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: React.ReactNode }) {
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="modal-card" role="dialog" aria-modal="true" aria-label={title}><div className="modal-header"><div><span className="eyebrow">TOVU · YOUR NEXT CHAPTER</span><h2>{title}</h2><p>{subtitle}</p></div><button onClick={onClose} aria-label="Close dialog"><X size={19} /></button></div>{children}</section></div>;
+}
+
+function Footer({ onNavigate }: { onNavigate: (page: Page) => void }) {
+  return <footer className="app-footer"><button className="wordmark footer-wordmark" onClick={() => onNavigate('home')}><span className="wordmark-icon">T</span><span>TOVU<span className="wordmark-period">.</span></span></button><p>Your hair. Your style. Your moment.</p><div><button onClick={() => onNavigate('explore')}>Directory</button><button onClick={() => onNavigate('inspiration')}>Style journal</button><button onClick={() => onNavigate('bookings')}>Appointments</button></div><small>© {new Date().getFullYear()} TOVU · Product preview. Sample listings are illustrative.</small></footer>;
 }
 
 export default App;
