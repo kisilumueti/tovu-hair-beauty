@@ -8,3 +8,9 @@
 .form-switch{border:0;background:none;color:#8b6254;text-decoration:underline;text-underline-offset:3px;font-size:9px;padding:5px;justify-self:center}
 
 .remove-service{border:0;background:none;color:#a15f52;font-size:8px;padding:6px 8px}.remove-service:hover{text-decoration:underline}.signout-button{padding:8px}
+
+.provider-image-placeholder,.profile-cover-placeholder{width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(135deg,#e7d9c8,#b89b84);color:#fff;font-family:'Playfair Display',serif;font-size:68px}
+.provider-avatar{display:grid;place-items:center;background:#eee4d8;color:#8b6254;font-family:'Playfair Display',serif;font-size:17px}
+.booking-avatar-placeholder{width:48px;height:48px;display:grid;place-items:center;background:#e7d9c8;color:#8b6254;font-family:'Playfair Display',serif;font-size:23px;flex-shrink:0}
+.profile-cover-placeholder{height:280px}
+@media(max-width:760px){.profile-cover-placeholder{height:200px}}
