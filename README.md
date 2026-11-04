@@ -4,15 +4,15 @@
 
 TOVU is a premium hair and beauty discovery and appointment-booking experience designed for customers, independent stylists, and salons. The initial product direction is Kenya-first, with a responsive web interface and a local JSON-backed preview workflow.
 
-> **Current status:** Interactive frontend preview. Sample directory entries and style inspiration are illustrative. This is not yet a production multi-user booking service.
+> **Current status:** Interactive frontend preview. The professional directory starts empty so no fabricated salons, stylists, prices, reviews, or bookings are presented as real. The style gallery contains editorial inspiration references. This is not yet a production multi-user booking service.
 
 ## Current functionality
 
 ### Customer experience
 - Premium landing page and service discovery.
 - Search and filter professionals by name, service, provider type, and location.
-- Browse sample salon and independent stylist profiles.
-- Explore a visual style inspiration gallery.
+- Browse salon and independent stylist profiles after they register.
+- Explore a visual style inspiration gallery using editorial reference imagery.
 - Request appointments by service, date, and time.
 - View guest booking requests in the current browser.
 - Create a local customer profile and review its booking history.
