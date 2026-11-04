@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import {
   ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronDown, Download,
-  Heart, MapPin, Menu, Plus, Search, ShieldCheck, SlidersHorizontal,
+  Heart, LogOut, MapPin, Menu, Plus, Search, ShieldCheck, SlidersHorizontal,
   Sparkles, Upload, UserRound, X,
 } from 'lucide-react';
 import { inspirationLooks } from './data';
@@ -237,7 +237,7 @@ function App() {
           {currentUser && currentUser.role !== 'customer' && <button className={page === 'dashboard' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('dashboard')}>Business studio</button>}
         </nav>
         <div className="header-controls">
-          {currentUser ? <button className="profile-chip" onClick={() => navigate(currentUser.role === 'customer' ? 'bookings' : 'dashboard')}><span className="profile-avatar">{currentUser.name.slice(0, 1).toUpperCase()}</span><span>{currentUser.name.split(' ')[0]}</span><ChevronDown size={14} /></button> : <button className="button button-quiet" onClick={() => { setModal('account'); setShowRegister(true); }}>Sign in / Join</button>}
+          {currentUser ? <button className="profile-chip" onClick={() => navigate(currentUser.role === 'customer' ? 'bookings' : 'dashboard')}><span className="profile-avatar">{currentUser.name.slice(0, 1).toUpperCase()}</span><span>{currentUser.name.split(' ')[0]}</span><ChevronDown size={14} /></button><button className="button button-quiet signout-button" onClick={signOut} title="Sign out"><LogOut size={14} /></button> : <button className="button button-quiet" onClick={() => { setModal('account'); setShowRegister(true); }}>Sign in / Join</button>}
           <button className="button button-ink header-join" onClick={() => { setModal('account'); setShowRegister(true); }}>Join TOVU <ArrowUpRight size={15} /></button>
         </div>
         <button className="mobile-menu-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation">{mobileMenu ? <X /> : <Menu />}</button>
