@@ -211,8 +211,10 @@ function App() {
   };
 
   const handleImport = async (event: FormEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
+    input.value = '';
     try {
       const imported = await importDatabase(file);
       setDb(imported);
