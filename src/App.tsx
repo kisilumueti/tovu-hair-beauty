@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronDown,
-  Clock3, Menu, Search, ShieldCheck, Sparkles, X,
+  ArrowRight, ArrowUpRight, CalendarDays, ChevronDown,
+  Menu, Search, ShieldCheck, Sparkles, X,
 } from 'lucide-react';
 
 const serviceCategories = [
