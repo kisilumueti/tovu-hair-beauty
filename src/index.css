@@ -6,3 +6,5 @@
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
 
 .form-switch{border:0;background:none;color:#8b6254;text-decoration:underline;text-underline-offset:3px;font-size:9px;padding:5px;justify-self:center}
+
+.remove-service{border:0;background:none;color:#a15f52;font-size:8px;padding:6px 8px}.remove-service:hover{text-decoration:underline}.signout-button{padding:8px}
