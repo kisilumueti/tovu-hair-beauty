@@ -98,8 +98,8 @@ function App() {
       const provider: Professional = {
         id, role, name, businessName: businessName || name, email, phone, location,
         bio: bio || 'New TOVU professional. Profile information coming soon.',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-        cover: 'https://images.unsplash.com/photo-1600948836101-f9ffda59d250?auto=format&fit=crop&w=900&q=80',
+        avatar: '',
+        cover: '',
         services: [], priceFrom: 0, verified: false, createdAt: new Date().toISOString(), idProvided: true,
       };
       nextDb = { ...nextDb, professionals: [...nextDb.professionals, provider] };
@@ -273,9 +273,9 @@ function App() {
 
           <section className="section-shell feature-section">
             <div className="section-heading"><div><span className="eyebrow">THE TOVU DISCOVERY EDIT</span><h2>Find the right hands<br /><em>for your next look.</em></h2></div><button className="text-link" onClick={() => navigate('explore')}>View all professionals <ArrowUpRight size={15} /></button></div>
-            <div className="provider-grid">
+            {db.professionals.length ? <div className="provider-grid">
               {db.professionals.slice(0, 3).map((provider) => <ProviderCard key={provider.id} provider={provider} services={db.services.filter((service) => service.professionalId === provider.id)} onBook={openBooking} onOpen={() => { setSelectedProfessional(provider); navigate('explore'); }} />)}
-            </div>
+            </div> : <EmptyState title="The directory is ready for its first professionals" text="No salons or stylists have been added yet. Register your business to create the first genuine TOVU listing." action="Register your salon or studio" onAction={() => { setModal('account'); setShowRegister(true); }} />}
           </section>
 
           <section className="inspiration-band">
@@ -299,7 +299,7 @@ function App() {
           <div className="directory-toolbar"><div className="directory-search"><Search size={17} /><input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search names, services or locations" /></div><div className="filter-control"><SlidersHorizontal size={15} /><select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}><option>All providers</option><option value="stylist">Independent stylists</option><option value="salon">Salons</option></select></div><select className="filter-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All services</option><option>Hair styling</option><option>Braids & locs</option><option>Hair care</option><option>Makeup</option><option>Nails & beauty</option></select><input className="location-filter" value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} placeholder="Location" /></div>
           <div className="directory-meta"><span>{providers.length} {providers.length === 1 ? 'professional' : 'professionals'} found</span><span>Preview directory · listings marked as sample are illustrative</span></div>
           {providers.length ? <div className="provider-grid directory-grid">{providers.map((provider) => <ProviderCard key={provider.id} provider={provider} services={db.services.filter((service) => service.professionalId === provider.id)} onBook={openBooking} onOpen={() => setSelectedProfessional(provider)} />)}</div> : <EmptyState title="No professionals found" text="Try a different search term, service or location." action="Clear filters" onAction={() => { setSearchTerm(''); setLocationFilter(''); setCategoryFilter('All services'); setRoleFilter('All providers'); }} />}
-          {selectedProfessional && <div className="profile-detail"><button className="close-detail" onClick={() => setSelectedProfessional(null)}><X size={16} /></button><img src={selectedProfessional.cover} alt="" /><div><span className="eyebrow">PROFESSIONAL PROFILE</span><h2>{selectedProfessional.businessName}</h2><p>{selectedProfessional.bio}</p><p className="detail-location"><MapPin size={14} />{selectedProfessional.location}</p><div className="detail-services">{db.services.filter((service) => service.professionalId === selectedProfessional.id).map((service) => <button key={service.id} onClick={() => openBooking(selectedProfessional, service)}><span><strong>{service.name}</strong><small>{service.durationMinutes} min</small></span><b>{money(service.price)}</b><ArrowUpRight size={15} /></button>)}</div></div></div>}
+          {selectedProfessional && <div className="profile-detail"><button className="close-detail" onClick={() => setSelectedProfessional(null)}><X size={16} /></button>{selectedProfessional.cover ? <img src={selectedProfessional.cover} alt="" /> : <div className="profile-cover-placeholder">{selectedProfessional.businessName.slice(0, 1)}</div>}<div><span className="eyebrow">PROFESSIONAL PROFILE</span><h2>{selectedProfessional.businessName}</h2><p>{selectedProfessional.bio}</p><p className="detail-location"><MapPin size={14} />{selectedProfessional.location}</p><div className="detail-services">{db.services.filter((service) => service.professionalId === selectedProfessional.id).map((service) => <button key={service.id} onClick={() => openBooking(selectedProfessional, service)}><span><strong>{service.name}</strong><small>{service.durationMinutes} min</small></span><b>{money(service.price)}</b><ArrowUpRight size={15} /></button>)}</div></div></div>}
         </main>
       )}
 
@@ -363,7 +363,7 @@ function App() {
 
       {modal === 'booking' && selectedProfessional && selectedService && <ModalShell title="Request an appointment" subtitle={`Booking with ${selectedProfessional.businessName}`} onClose={() => { setModal(null); setError(''); }}>
         <form className="form-stack" onSubmit={handleBooking}>
-          <div className="booking-service-summary"><img src={selectedProfessional.avatar} alt="" /><div><strong>{selectedService.name}</strong><span>{selectedProfessional.businessName} · {selectedProfessional.location}</span><small>{selectedService.durationMinutes} minutes</small></div><b>{money(selectedService.price)}</b></div>
+          <div className="booking-service-summary">{selectedProfessional.avatar ? <img src={selectedProfessional.avatar} alt="" /> : <span className="booking-avatar-placeholder">{selectedProfessional.businessName.slice(0, 1)}</span>}<div><strong>{selectedService.name}</strong><span>{selectedProfessional.businessName} · {selectedProfessional.location}</span><small>{selectedService.durationMinutes} minutes</small></div><b>{money(selectedService.price)}</b></div>
           <label>YOUR NAME<input name="customerName" required defaultValue={currentUser?.name ?? ''} placeholder="Full name" /></label>
           <label>PHONE NUMBER<input name="customerPhone" required defaultValue={currentUser?.phone ?? ''} placeholder="+254 7XX XXX XXX" /></label>
           <div className="form-two"><label>DATE<input name="date" type="date" min={today()} required /></label><label>TIME<select name="time" required defaultValue=""><option value="" disabled>Select a time</option>{['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00'].map((time) => <option key={time}>{time}</option>)}</select></label></div>
@@ -392,8 +392,8 @@ function App() {
 
 function ProviderCard({ provider, services, onBook, onOpen }: { provider: Professional; services: Service[]; onBook: (provider: Professional, service?: Service) => void; onOpen: () => void }) {
   return <article className="provider-card">
-    <button className="provider-cover" onClick={onOpen}><img src={provider.cover} alt={`Editorial image for ${provider.businessName}`} loading="lazy" /><span className="sample-tag">PREVIEW LISTING</span><span className="provider-type">{provider.role === 'salon' ? 'SALON' : 'INDEPENDENT STYLIST'}</span></button>
-    <div className="provider-info"><div className="provider-heading"><div><h3>{provider.businessName}</h3><span>{provider.name}</span></div><span className="provider-avatar"><img src={provider.avatar} alt="" /></span></div><p className="provider-location"><MapPin size={13} />{provider.location}</p><p className="provider-bio">{provider.bio}</p><div className="provider-tags">{provider.services.slice(0, 3).map((service) => <span key={service}>{service}</span>)}</div><div className="provider-card-footer"><span>From <strong>{provider.priceFrom ? money(provider.priceFrom) : 'Set your prices'}</strong></span>{services.length ? <button onClick={() => onBook(provider, services[0])}>Book now <ArrowUpRight size={14} /></button> : <button onClick={onOpen}>View profile <ArrowUpRight size={14} /></button>}</div></div>
+    <button className="provider-cover" onClick={onOpen}>{provider.cover ? <img src={provider.cover} alt={`Cover image for ${provider.businessName}`} loading="lazy" /> : <span className="provider-image-placeholder">{provider.businessName.slice(0, 1)}</span>}<span className="provider-type">{provider.role === 'salon' ? 'SALON' : 'INDEPENDENT STYLIST'}</span></button>
+    <div className="provider-info"><div className="provider-heading"><div><h3>{provider.businessName}</h3><span>{provider.name}</span></div><span className="provider-avatar">{provider.avatar ? <img src={provider.avatar} alt="" /> : provider.name.slice(0, 1)}</span></div><p className="provider-location"><MapPin size={13} />{provider.location}</p><p className="provider-bio">{provider.bio}</p><div className="provider-tags">{provider.services.slice(0, 3).map((service) => <span key={service}>{service}</span>)}</div><div className="provider-card-footer"><span>From <strong>{provider.priceFrom ? money(provider.priceFrom) : 'Set your prices'}</strong></span>{services.length ? <button onClick={() => onBook(provider, services[0])}>Book now <ArrowUpRight size={14} /></button> : <button onClick={onOpen}>View profile <ArrowUpRight size={14} /></button>}</div></div>
   </article>;
 }
 
