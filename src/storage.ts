@@ -1,4 +1,3 @@
-import { sampleProfessionals, sampleServices } from './data';
 import type { TovuDatabase } from './types';
 
 const STORAGE_KEY = 'tovu.marketplace.database.v1';
@@ -7,8 +6,8 @@ function createInitialDatabase(): TovuDatabase {
   return {
     version: 1,
     customers: [],
-    professionals: sampleProfessionals,
-    services: sampleServices,
+    professionals: [],
+    services: [],
     bookings: [],
   };
 }
