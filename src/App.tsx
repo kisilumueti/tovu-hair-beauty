@@ -12,7 +12,7 @@ type Page = 'home' | 'explore' | 'inspiration' | 'bookings' | 'dashboard';
 type Modal = 'account' | 'booking' | 'service' | null;
 
 const money = (amount: number) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(amount);
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 
 function App() {
   const [db, setDb] = useState<TovuDatabase>(() => loadDatabase());
@@ -140,8 +140,16 @@ function App() {
     const time = String(form.get('time'));
     if (!customerName || !customerPhone || !date || !time) { setError('Complete all booking details.'); return; }
     if (date < today()) { setError('Choose a future date.'); return; }
-    const conflict = db.bookings.some((booking) => booking.professionalId === selectedProfessional.id && booking.date === date && booking.time === time && booking.status !== 'cancelled');
-    if (conflict) { setError('That time has already been requested. Please choose another slot.'); return; }
+    const requestedStart = Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+    const requestedEnd = requestedStart + selectedService.durationMinutes;
+    const conflict = db.bookings.some((booking) => {
+      if (booking.professionalId !== selectedProfessional.id || booking.date !== date || booking.status === 'cancelled') return false;
+      const existingStart = Number(booking.time.slice(0, 2)) * 60 + Number(booking.time.slice(3, 5));
+      const existingDuration = db.services.find((service) => service.id === booking.serviceId)?.durationMinutes ?? 60;
+      const existingEnd = existingStart + existingDuration;
+      return requestedStart < existingEnd && existingStart < requestedEnd;
+    });
+    if (conflict) { setError('That appointment overlaps an existing request. Please choose another time.'); return; }
 
     const booking: Booking = {
       id: createId('booking'), customerId: currentUser?.id ?? 'guest',
@@ -291,7 +299,7 @@ function App() {
         <main className="page-shell">
           <div className="page-intro dashboard-intro"><span className="eyebrow">YOUR TOVU SPACE</span><h1>{currentUser ? 'Your appointments.' : 'Your next appointment.'}<br /><em>All in one place.</em></h1><p>{currentUser ? `Welcome back, ${currentUser.name}. Here are the appointments connected to this local profile.` : 'You can request a booking without creating an account. Register to keep a local customer profile and view your bookings here.'}</p></div>
           {!currentUser && <div className="account-prompt"><UserRound size={21} /><div><strong>Want to keep track of your appointments?</strong><p>Create a customer profile on this device to keep your booking history together.</p></div><button className="button button-ink" onClick={() => { setModal('account'); setShowRegister(true); }}>Create profile</button></div>}
-          <div className="booking-list">{ownBookings.length ? ownBookings.map((booking) => <BookingRow key={booking.id} booking={booking} onUpdate={updateBooking} customerView={currentUser?.role === 'customer'} />) : <EmptyState title="No appointments yet" text="Your booking requests will appear here after you choose a professional and service." action="Explore professionals" onAction={() => navigate('explore')} />}</div>
+          <div className="booking-list">{ownBookings.length ? ownBookings.map((booking) => <BookingRow key={booking.id} booking={booking} onUpdate={updateBooking} customerView={currentUser?.role === 'customer' || booking.customerId === 'guest'} />) : <EmptyState title="No appointments yet" text="Your booking requests will appear here after you choose a professional and service." action="Explore professionals" onAction={() => navigate('explore')} />}</div>
           {db.bookings.some((booking) => booking.customerId === 'guest') && <p className="local-note">Guest booking requests are stored on this browser. Create a profile before your next booking to associate future appointments with your account.</p>}
         </main>
       )}
@@ -374,7 +382,7 @@ function ProviderCard({ provider, services, onBook, onOpen }: { provider: Profes
 }
 
 function BookingRow({ booking, onUpdate, customerView }: { booking: Booking; onUpdate: (id: string, status: BookingStatus) => void; customerView: boolean }) {
-  return <article className="booking-row"><div className="booking-date"><strong>{new Date(`${booking.date}T00:00:00`).toLocaleDateString('en-KE', { day: '2-digit' })}</strong><span>{new Date(`${booking.date}T00:00:00`).toLocaleDateString('en-KE', { month: 'short' })}</span></div><div className="booking-main"><strong>{booking.serviceName}</strong><span>{customerView ? booking.professionalName : booking.customerName} · {booking.date} at {booking.time}</span><small>{booking.customerPhone}</small>{booking.notes && <small>Note: {booking.notes}</small>}</div><div className="booking-actions"><b>{money(booking.price)}</b><span className={`status-pill status-${booking.status}`}>{booking.status}</span>{!customerView && booking.status === 'pending' && <div><button onClick={() => onUpdate(booking.id, 'confirmed')}>Confirm</button><button onClick={() => onUpdate(booking.id, 'cancelled')}>Decline</button></div>}{!customerView && booking.status === 'confirmed' && <button onClick={() => onUpdate(booking.id, 'completed')}>Mark completed</button>}</div></article>;
+  return <article className="booking-row"><div className="booking-date"><strong>{new Date(`${booking.date}T00:00:00`).toLocaleDateString('en-KE', { day: '2-digit' })}</strong><span>{new Date(`${booking.date}T00:00:00`).toLocaleDateString('en-KE', { month: 'short' })}</span></div><div className="booking-main"><strong>{booking.serviceName}</strong><span>{customerView ? booking.professionalName : booking.customerName} · {booking.date} at {booking.time}</span><small>{booking.customerPhone}</small>{booking.notes && <small>Note: {booking.notes}</small>}</div><div className="booking-actions"><b>{money(booking.price)}</b><span className={`status-pill status-${booking.status}`}>{booking.status}</span>{!customerView && booking.status === 'pending' && <div><button onClick={() => onUpdate(booking.id, 'confirmed')}>Confirm</button><button onClick={() => onUpdate(booking.id, 'cancelled')}>Decline</button></div>}{!customerView && booking.status === 'confirmed' && <button onClick={() => onUpdate(booking.id, 'completed')}>Mark completed</button>}{customerView && booking.status === 'pending' && <button onClick={() => onUpdate(booking.id, 'cancelled')}>Cancel request</button>}</div></article>;
 }
 
 function EmptyState({ title, text, action, onAction }: { title: string; text: string; action?: string; onAction?: () => void }) {
