@@ -188,6 +188,21 @@ function App() {
     notify('Your service has been published to this browser catalogue.');
   };
 
+
+  const removeService = (serviceId: string) => {
+    if (!ownProvider || !window.confirm('Remove this service from your public catalogue?')) return;
+    const remaining = db.services.filter((service) => service.id !== serviceId);
+    const providerServices = remaining.filter((service) => service.professionalId === ownProvider.id);
+    setDb({
+      ...db,
+      services: remaining,
+      professionals: db.professionals.map((provider) => provider.id === ownProvider.id
+        ? { ...provider, services: providerServices.map((service) => service.name), priceFrom: providerServices.length ? Math.min(...providerServices.map((service) => service.price)) : 0 }
+        : provider),
+    });
+    notify('Service removed from your catalogue.');
+  };
+
   const signOut = () => {
     localStorage.removeItem('tovu.active.profile');
     setCurrentUser(null);
@@ -310,7 +325,7 @@ function App() {
             <div className="dashboard-welcome"><div><span className="eyebrow">TOVU BUSINESS STUDIO</span><h1>Welcome, <em>{ownProvider.businessName}.</em></h1><p>Manage your services and appointment requests from one workspace.</p></div><button className="button button-outline-dark" onClick={() => setModal('service')}><Plus size={16} /> Add a service</button></div>
             <div className="stats-grid"><div><span>TOTAL REQUESTS</span><strong>{ownBookings.length}</strong><small>All booking statuses</small></div><div><span>PENDING</span><strong>{ownBookings.filter((booking) => booking.status === 'pending').length}</strong><small>Awaiting your response</small></div><div><span>CONFIRMED</span><strong>{ownBookings.filter((booking) => booking.status === 'confirmed').length}</strong><small>Upcoming appointments</small></div><div><span>LIVE SERVICES</span><strong>{db.services.filter((service) => service.professionalId === ownProvider.id).length}</strong><small>Your catalogue</small></div></div>
             <section className="dashboard-panel"><div className="panel-heading"><div><span className="eyebrow">YOUR CATALOGUE</span><h2>Services & pricing</h2></div><button className="button button-quiet" onClick={() => setModal('service')}><Plus size={15} /> Add service</button></div>
-              {db.services.filter((service) => service.professionalId === ownProvider.id).length ? <div className="service-manage-list">{db.services.filter((service) => service.professionalId === ownProvider.id).map((service) => <div key={service.id}><div><strong>{service.name}</strong><span>{service.category} · {service.durationMinutes} minutes</span></div><b>{money(service.price)}</b></div>)}</div> : <EmptyState title="Your catalogue is ready for its first service" text="Add a service so customers can understand what you offer and request an appointment." action="Add your first service" onAction={() => setModal('service')} />}
+              {db.services.filter((service) => service.professionalId === ownProvider.id).length ? <div className="service-manage-list">{db.services.filter((service) => service.professionalId === ownProvider.id).map((service) => <div key={service.id}><div><strong>{service.name}</strong><span>{service.category} · {service.durationMinutes} minutes</span></div><b>{money(service.price)}</b><button className="remove-service" onClick={() => removeService(service.id)}>Remove</button></div>)}</div> : <EmptyState title="Your catalogue is ready for its first service" text="Add a service so customers can understand what you offer and request an appointment." action="Add your first service" onAction={() => setModal('service')} />}
             </section>
             <section className="dashboard-panel"><div className="panel-heading"><div><span className="eyebrow">CLIENT MANAGEMENT</span><h2>Appointment requests</h2></div><span className="panel-count">{ownBookings.length} total</span></div>
               {ownBookings.length ? <div className="booking-list compact-bookings">{ownBookings.map((booking) => <BookingRow key={booking.id} booking={booking} onUpdate={updateBooking} customerView={false} />)}</div> : <EmptyState title="No appointment requests yet" text="When customers request your services, they will appear here." />}
