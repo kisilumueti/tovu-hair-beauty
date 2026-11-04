@@ -1,226 +1,133 @@
-# TOVU — Hair & Beauty Booking Platform
+# TOVU — Hair & Beauty Marketplace
 
 **Your hair. Your style. Your moment.**
 
-TOVU is a modern hair and beauty discovery and appointment-booking platform designed to connect customers with professional hairstylists, independent beauty professionals, and salons.
+TOVU is a premium hair and beauty discovery and appointment-booking experience designed for customers, independent stylists, and salons. The initial product direction is Kenya-first, with a responsive web interface and a local JSON-backed preview workflow.
 
-Our mission is to simplify how people discover beauty services, explore styles, compare prices, and book appointments while empowering beauty professionals to grow their businesses through digital technology.
+> **Current status:** Interactive frontend preview. Sample directory entries and style inspiration are illustrative. This is not yet a production multi-user booking service.
 
-**Initial market:** Kenya  
-**Platform:** Responsive Web Application  
-**Project status:** Frontend Development — Initial Stage
+## Current functionality
 
----
+### Customer experience
+- Premium landing page and service discovery.
+- Search and filter professionals by name, service, provider type, and location.
+- Browse sample salon and independent stylist profiles.
+- Explore a visual style inspiration gallery.
+- Request appointments by service, date, and time.
+- View guest booking requests in the current browser.
+- Create a local customer profile and review its booking history.
 
-## 1. Vision
+### Stylist and salon experience
+- Register as an independent stylist or salon / beauty business.
+- Kenyan National ID number is required as the registration qualification field.
+- Create a public professional profile.
+- Publish services with category, description, price, and duration.
+- Review appointment requests.
+- Confirm, decline, and mark appointments as completed.
+- View a business overview with booking and service counts.
 
-To build a trusted digital marketplace where customers can discover and book quality hair and beauty services while professionals manage their businesses, clients, services, and appointments from one platform.
+### JSON data management
+- Versioned JSON data model for customers, professionals, services, and bookings.
+- Automatic browser persistence using `localStorage`.
+- Export the current database as a JSON backup.
+- Import a previously exported TOVU JSON backup.
 
-## 2. Platform Users
+**Important storage limitation:** Browser storage is local to the device and browser profile. It does not synchronize records between different customers, devices, or salons. Clearing browser data can remove locally stored records. Export backups regularly. A shared production marketplace requires a central API and database.
 
-### Customers
-- Discover salons and independent hairstylists.
-- Search by location, service, and professional.
-- Explore hairstyle portfolios and inspiration.
-- Compare service descriptions and prices.
-- Select preferred professionals.
-- Book and manage appointments.
-- View appointment history.
-- Submit reviews and ratings.
+**Identity and privacy limitation:** The professional registration form validates the format of a Kenyan National ID number, but this frontend preview deliberately does not retain the ID number. It records only that the ID field was supplied. No identity, qualification, business, or regulatory verification takes place. Production registration must use secure server-side processing, lawful data handling, and an approved verification workflow. Never collect or store sensitive identity numbers in browser local storage.
 
-### Independent Stylists
-- Create professional profiles.
-- Upload hairstyle portfolios.
-- Publish services and pricing.
-- Configure working hours and availability.
-- Accept, manage, and track appointments.
-- Build a professional customer base.
-- Manage customer reviews.
+**Authentication limitation:** Local profile access uses an email lookup in the current browser. It is a demonstration workflow, not secure authentication. Production must implement secure server-side authentication, password or passkey handling, sessions, authorization, and audit controls.
 
-### Salons and Beauty Businesses
-- Create salon business profiles.
-- Register and manage team members.
-- Publish service catalogues.
-- Configure service prices and durations.
-- Manage staff availability.
-- Monitor appointments and business activity.
-- Access operational dashboards.
+**Booking limitation:** Appointment requests are stored locally and a basic same-time conflict check is applied in the current browser. There is no server-side availability lock, payment processing, SMS/email notification, or cross-device synchronization yet. Production booking integrity must be enforced by the backend.
 
-## 3. Core Features
+## Technology
 
-| Feature | Description |
-|---|---|
-| Discovery | Search for salons and professionals |
-| Service catalogue | Browse services, descriptions, and prices |
-| Portfolio | View professional hairstyle galleries |
-| Booking | Select services, professionals, dates, and times |
-| Availability | Manage professional schedules |
-| Customer accounts | Manage profiles and bookings |
-| Professional dashboard | Manage services and appointments |
-| Salon management | Manage teams, services, and bookings |
-| Reviews | Customer feedback and ratings |
-| Notifications | Appointment confirmations and reminders |
-
-## 4. Technology Stack
-
-The initial frontend architecture will use:
-
-- React
+- React 19
 - TypeScript
 - Vite
-- Tailwind CSS
-- React Router
-- Lucide Icons
+- Lucide React
 - Framer Motion
-- Zustand
+- React Router (available for route expansion)
+- Zustand (available for shared state expansion)
 
-### Planned Backend Architecture
+## Run locally
 
-- Laravel REST API
-- PHP 8.3+
-- MySQL
-- Role-based access control
-- Secure authentication
-- API validation and rate limiting
-- Payment gateway integration
-- Notification services
+Requirements: Node.js 20.19+ or 22.12+ and npm.
 
-The architecture will be designed to support growth beyond 100,000 registered users through modular services, optimized database access, caching, and scalable infrastructure.
+```bash
+git clone https://github.com/kisilumueti/tovu-hair-beauty.git
+cd tovu-hair-beauty
+npm install
+npm run dev
+```
 
-## 5. Design System
+Open the local URL printed by Vite.
 
-TOVU will use a premium, contemporary beauty-focused visual identity.
+Production build:
 
-| Colour | Hex |
-|---|---|
-| Espresso | #171411 |
-| Champagne | #D7B98E |
-| Ivory | #F5E9D5 |
-| Rosewood | #A47767 |
-| White | #FFFFFF |
+```bash
+npm run typecheck
+npm run build
+npm run preview
+```
 
-### Design Principles
-- Mobile-first responsive design.
-- Premium editorial presentation.
-- Smooth, purposeful animations.
-- Accessible navigation and controls.
-- Consistent typography and spacing.
-- Fast-loading pages and optimized imagery.
-- Clear booking and conversion experiences.
-
-## 6. Planned Frontend Structure
+## Project structure
 
 ```text
 tovu-hair-beauty/
-│
 ├── public/
-│   ├── images/
-│   ├── icons/
-│   └── favicon.svg
-│
 ├── src/
-│   ├── assets/
-│   │
-│   ├── components/
-│   │   ├── common/
-│   │   ├── layout/
-│   │   ├── navigation/
-│   │   ├── booking/
-│   │   ├── salon/
-│   │   └── stylist/
-│   │
-│   ├── features/
-│   │   ├── authentication/
-│   │   ├── discovery/
-│   │   ├── appointments/
-│   │   ├── customers/
-│   │   ├── professionals/
-│   │   └── salons/
-│   │
-│   ├── pages/
-│   │   ├── Home/
-│   │   ├── Explore/
-│   │   ├── Services/
-│   │   ├── Stylists/
-│   │   ├── Salons/
-│   │   ├── Booking/
-│   │   ├── Profile/
-│   │   └── Dashboard/
-│   │
-│   ├── hooks/
-│   ├── services/
-│   ├── stores/
-│   ├── types/
-│   ├── utils/
-│   │
-│   ├── App.tsx
+│   ├── App.tsx          # Marketplace screens and interactions
+│   ├── data.ts          # Clearly labelled preview catalogue and style ideas
+│   ├── storage.ts       # Versioned JSON local persistence and backup
+│   ├── types.ts         # Domain contracts
 │   ├── main.tsx
-│   └── index.css
-│
+│   └── index.css        # Responsive premium design system
 ├── .env.example
-├── .gitignore
 ├── index.html
 ├── package.json
-├── tsconfig.json
 └── README.md
 ```
 
-## 7. Development Roadmap
+## Visual identity
 
-- [ ] Initialize React and TypeScript.
-- [ ] Establish the design system.
-- [ ] Build responsive navigation and application layout.
-- [ ] Develop the landing page.
-- [ ] Build service discovery and search.
-- [ ] Develop stylist profiles and portfolios.
-- [ ] Develop salon profiles.
-- [ ] Build the appointment booking interface.
-- [ ] Implement customer dashboards.
-- [ ] Implement professional dashboards.
-- [ ] Integrate Laravel API.
-- [ ] Implement authentication and authorization.
-- [ ] Integrate payment processing.
-- [ ] Implement appointment notifications.
-- [ ] Add automated tests.
-- [ ] Prepare production deployment.
+| Token | Value |
+|---|---|
+| Espresso | `#171411` |
+| Champagne | `#D7B98E` |
+| Ivory | `#F5E9D5` |
+| Rosewood | `#A47767` |
+| Paper | `#FBF9F5` |
 
-## 8. Security and Reliability
+The interface uses responsive layouts, accessible labels, keyboard focus states, and reduced-motion support.
 
-Security will be incorporated throughout development.
+## Production roadmap
 
-- Secure authentication and session management.
-- Server-side authorization.
-- Input validation and sanitization.
-- Protection against common web vulnerabilities.
-- Secure payment integration.
-- API rate limiting.
-- Audit logging for sensitive operations.
-- Protection of customer and business information.
-- Server-authoritative appointment availability.
-- Database backup and recovery strategy.
+- [ ] Replace local profile lookup with secure authentication and role-based authorization.
+- [ ] Build a Laravel REST API and MySQL persistence layer.
+- [ ] Add server-side National ID verification through a lawful, approved provider/process.
+- [ ] Add salon ownership, team member invitations, and staff scheduling.
+- [ ] Implement recurring business hours, time-off, and service-specific availability.
+- [ ] Enforce overlapping appointment prevention with database transactions and locking.
+- [ ] Add customer and professional notifications.
+- [ ] Integrate a payment provider and payment reconciliation.
+- [ ] Add image upload, moderation, and portfolio management.
+- [ ] Add reviews with verified-booking eligibility.
+- [ ] Add automated tests, CI, monitoring, backups, and deployment controls.
+- [ ] Load-test the API and database for the target scale of 100,000+ accounts.
 
-No real customer records, passwords, API credentials, or production secrets should be committed to this repository.
+## Security principles
 
-## 9. Development Philosophy
+- Do not commit API keys, passwords, access tokens, identity records, or customer data.
+- Enforce authorization and validation on the server.
+- Store identity data only when legally necessary, with encryption, retention controls, and strict access restrictions.
+- Never trust client-side booking availability or price values.
+- Keep payment card data out of TOVU systems; use a compliant payment provider.
+- Apply rate limiting, audit logging, backup, and recovery controls.
 
-TOVU will be built as a production-oriented platform rather than a static demonstration.
+## License
 
-Development priorities:
-
-1. Clean and maintainable architecture.
-2. Reusable components.
-3. Strong TypeScript contracts.
-4. Responsive and accessible interfaces.
-5. Performance optimization.
-6. Reliable booking workflows.
-7. Secure API integration.
-8. Long-term scalability.
-
-Any preview content must be clearly identified as sample content rather than presented as real platform listings or live bookings.
-
-## 10. License
-
-All rights reserved. No open-source license has currently been assigned to this project.
+All rights reserved. No open-source license has been assigned.
 
 ---
 
