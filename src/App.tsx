@@ -224,7 +224,6 @@ function App() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not import this backup.');
     }
-    event.currentTarget.value = '';
   };
 
   return (
