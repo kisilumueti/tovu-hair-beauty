@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import {
-  ArrowLeft, ArrowRight, ArrowUpRight, BadgeCheck, CalendarDays, Check,
-  ChevronDown, Clock3, Download, Heart, ImagePlus, LogOut, MapPin, Menu,
-  Plus, Search, ShieldCheck, SlidersHorizontal, Sparkles, Upload, UserRound,
-  Users, X,
+  ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronDown, Download,
+  Heart, MapPin, Menu, Plus, Search, ShieldCheck, SlidersHorizontal,
+  Sparkles, Upload, UserRound, X,
 } from 'lucide-react';
 import { inspirationLooks } from './data';
 import { createId, exportDatabase, importDatabase, loadDatabase, saveDatabase } from './storage';
@@ -47,7 +46,7 @@ function App() {
   }), [db.professionals, db.services, searchTerm, locationFilter, roleFilter, categoryFilter]);
 
   const ownBookings = useMemo(() => {
-    if (!currentUser) return [];
+    if (!currentUser) return db.bookings.filter((booking) => booking.customerId === 'guest');
     if (currentUser.role === 'customer') return db.bookings.filter((booking) => booking.customerId === currentUser.id);
     return db.bookings.filter((booking) => booking.professionalId === currentUser.id);
   }, [currentUser, db.bookings]);
@@ -114,6 +113,21 @@ function App() {
     setModal(null);
     notify(role === 'customer' ? 'Your customer profile is ready.' : 'Your professional profile is registered. Add your first service in the dashboard.');
     if (role === 'customer') navigate('bookings'); else navigate('dashboard');
+  };
+
+
+  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get('loginEmail')).trim().toLowerCase();
+    const existing = db.customers.find((customer) => customer.email === email);
+    if (!existing) { setError('No local profile was found for that email on this browser. Create a new profile instead.'); return; }
+    setCurrentUser(existing);
+    localStorage.setItem('tovu.active.profile', existing.id);
+    setError('');
+    setModal(null);
+    notify(`Welcome back, ${existing.name.split(' ')[0]}.`);
+    navigate(existing.role === 'customer' ? 'bookings' : 'dashboard');
   };
 
   const handleBooking = (event: FormEvent<HTMLFormElement>) => {
@@ -187,8 +201,6 @@ function App() {
     }
     event.currentTarget.value = '';
   };
-
-  const statusClass = (status: BookingStatus) => `status-pill status-${status}`;
 
   return (
     <div className="tovu-app">
@@ -303,7 +315,7 @@ function App() {
       {page !== 'home' && <Footer onNavigate={navigate} />}
 
       {modal === 'account' && <ModalShell title={showRegister ? 'Create your TOVU profile' : 'Welcome to TOVU'} subtitle="Set up a local preview profile to explore the customer or professional experience." onClose={() => { setModal(null); setError(''); }}>
-        <form className="form-stack" onSubmit={handleRegister}>
+        {showRegister ? <form className="form-stack" onSubmit={handleRegister}>
           <div className="form-callout"><ShieldCheck size={18} /><span>This preview stores profile details in this browser only. It does not create a secure online account.</span></div>
           <label>ACCOUNT TYPE<select name="role" defaultValue="customer"><option value="customer">Customer</option><option value="stylist">Independent stylist</option><option value="salon">Salon / beauty business</option></select></label>
           <label>FULL NAME<input name="name" required placeholder="Your full name" /></label>
@@ -315,7 +327,14 @@ function App() {
           {error && <p className="form-error">{error}</p>}
           <button className="button button-ink button-full" type="submit">Create local profile <ArrowRight size={16} /></button>
           <p className="form-footnote">By continuing, you understand this is a browser-based product preview, not a live identity or authentication service.</p>
-        </form>
+          <button type="button" className="form-switch" onClick={() => { setShowRegister(false); setError(''); }}>Already have a local profile? Sign in</button>
+        </form> : <form className="form-stack" onSubmit={handleLogin}>
+          <div className="form-callout"><UserRound size={18} /><span>Sign in to a profile previously created in this same browser. This is local preview access, not secure authentication.</span></div>
+          <label>EMAIL ADDRESS<input name="loginEmail" type="email" required placeholder="you@example.com" /></label>
+          {error && <p className="form-error">{error}</p>}
+          <button className="button button-ink button-full" type="submit">Open my profile <ArrowRight size={16} /></button>
+          <button type="button" className="form-switch" onClick={() => { setShowRegister(true); setError(''); }}>New to TOVU? Create a profile</button>
+        </form>}
       </ModalShell>}
 
       {modal === 'booking' && selectedProfessional && selectedService && <ModalShell title="Request an appointment" subtitle={`Booking with ${selectedProfessional.businessName}`} onClose={() => { setModal(null); setError(''); }}>
@@ -362,7 +381,7 @@ function EmptyState({ title, text, action, onAction }: { title: string; text: st
   return <div className="empty-state"><CalendarDays size={27} /><h2>{title}</h2><p>{text}</p>{action && onAction && <button className="button button-ink" onClick={onAction}>{action} <ArrowRight size={15} /></button>}</div>;
 }
 
-function ModalShell({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: React.ReactNode }) {
+function ModalShell({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: ReactNode }) {
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="modal-card" role="dialog" aria-modal="true" aria-label={title}><div className="modal-header"><div><span className="eyebrow">TOVU · YOUR NEXT CHAPTER</span><h2>{title}</h2><p>{subtitle}</p></div><button onClick={onClose} aria-label="Close dialog"><X size={19} /></button></div>{children}</section></div>;
 }
 
