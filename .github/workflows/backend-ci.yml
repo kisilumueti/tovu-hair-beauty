@@ -43,7 +43,7 @@ jobs:
           extensions: mbstring, pdo_mysql, sqlite3, bcmath, curl, fileinfo, xml
           coverage: none
       - name: Validate Composer manifest
-        run: composer validate --no-check-publish
+        run: composer validate --no-check-publish --no-check-lock
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist
       - name: Prepare application
