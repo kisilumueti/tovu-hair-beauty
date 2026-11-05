@@ -30,10 +30,10 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
+            'options' => extension_loaded('pdo_mysql') ? [
                 PDO::ATTR_EMULATE_PREPARES => false,
                 PDO::ATTR_TIMEOUT => 5,
-            ]) : [],
+            ] : [],
         ],
     ],
     'migrations' => [
