@@ -17,7 +17,7 @@ Browser storage does not synchronize users or bookings between devices. The loca
 
 ## Backend API
 
-The Laravel 12 API lives in the [backend directory](backend/README.md). It introduces MySQL-first persistence, Sanctum bearer-token authentication, customer/stylist/salon account roles, pending professional profiles, rate-limited authentication, request IDs, audit records, and a privacy-minimizing identity-verification gateway boundary.
+The Laravel 12 API lives in the [backend directory](backend/README.md). It includes MySQL-first persistence, Sanctum bearer-token authentication, customer/stylist/salon roles, pending professional profiles, privacy-minimizing identity-verification boundary, salon team invitations and membership, owner-scoped service catalogue management, verification-gated service publication, rate limits, request IDs, and audit records.
 
 Run backend setup and review the current API contract in [backend/README.md](backend/README.md). The React frontend is not yet wired to the API; do not enable live bookings until the API adapter and transactional booking workflow are complete.
 
@@ -35,7 +35,8 @@ Run backend setup and review the current API contract in [backend/README.md](bac
 - [x] Professional profiles default to pending verification.
 - [x] Identity-verification interface with no raw National ID retention in application tables.
 - [ ] Approved identity-verification provider, legal review, and data-processing agreement.
-- [ ] Salon ownership, teams, staff roles, and service management.
+- [x] Salon team invitations, membership, owner-scoped team management, and service catalogue APIs.
+- [ ] Staff-role-specific permissions and salon management delegation.
 - [ ] Staff availability, business hours, and time-off management.
 - [ ] Transactional booking conflict prevention and cancellation workflow.
 - [ ] Customer booking history and provider booking management.
