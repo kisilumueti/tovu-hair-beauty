@@ -15,13 +15,18 @@ Implemented in this milestone:
 - Identity verification attempts and audit events store provider metadata and status only; the raw National ID is not stored.
 - Request correlation IDs in the X-Request-ID response header.
 - Initial feature tests for customer and stylist registration and the unconfigured identity boundary.
+- Salon team invitations with 72-hour expiry, single-use SHA-256 token-hash storage, SMTP email delivery, and owner-only team administration.
+- Team membership roles (manager, stylist, receptionist), invitation acceptance, role updates, suspension, and audit events.
+- Provider-owned service catalogues with KES minor-unit pricing, durations, buffers, optional salon staff assignments, and archive semantics.
+- Public paginated service discovery and owner-scoped service create/update/archive endpoints; publishing is blocked until the professional profile is verified.
+- API rate limits: 5 authentication attempts/minute, 3 identity requests/minute, and 120 API requests/minute per account or IP.
 - Salon team invitations with expiring single-use tokens, SHA-256 token-hash storage, email delivery through configured SMTP, and owner-only team administration.
 - Team roles (manager, stylist, receptionist), membership suspension, and salon ownership checks.
 - Provider-owned service catalogues with integer minor-unit pricing, durations, buffers, active/archive status, and optional salon team assignment.
 - Public paginated service discovery and owner-scoped service create/update/archive endpoints.
 - Audit events for invitation and service/team changes.
 
-This is an incremental backend foundation, not a production-ready marketplace. Contact verification (email/phone OTP), business hours, staff schedules, server-side availability, transactional booking, cancellation, booking notifications, payments, operational hardening, and load testing remain roadmap items.
+This is an incremental backend foundation, not a production-ready marketplace. Team role labels are recorded but do not yet grant manager/receptionist privileges; salon management endpoints remain owner-only. Contact verification (email/phone OTP), business hours, staff schedules, server-side availability, transactional booking, cancellation, booking notifications, payments, operational hardening, and load testing remain roadmap items.
 
 ## Requirements
 
@@ -149,7 +154,7 @@ Create request:
 
 price_minor is an integer in the smallest unit of the selected currency. For KES, 250000 represents KES 2,500.00. The API currently accepts KES only. The frontend should convert the integer to its display amount by dividing by 100; never use floating-point arithmetic for server-side money calculations. Salon services may optionally list active team member IDs. Every assigned member must belong to the owning salon. Independent stylist services cannot have team assignments.
 
-A DELETE request archives the service by setting is_active=false; it does not physically delete historical service data. Public discovery returns active services only and uses page-based pagination (50 records per page).
+A DELETE request archives the service by setting is_active=false; it does not physically delete historical service data. Public discovery returns active services only and uses page-based pagination (50 records per page). New services default to inactive. An owner must have a verified professional profile before setting is_active=true; public discovery also filters out unverified profiles. The current identity-verification gateway is unavailable, so live publication remains blocked until an approved provider is configured.
 
 ### SMTP configuration
 
@@ -185,7 +190,7 @@ The frontend adapter must map API user and professional profile fields to the ex
 - Keep .env, database credentials, app keys, provider credentials, tokens, and all personal data out of Git.
 - Use HTTPS, a dedicated MySQL user, managed secrets, encrypted backups, least privilege, and restricted database/network access.
 - Set APP_DEBUG=false in every shared environment.
-- Configure a shared Redis cache and durable queue before running multiple application instances.
+- Configure a shared Redis cache and durable queue before running multiple application instances. The current file cache is not a cross-instance rate-limit store; use Redis for horizontally scaled production deployments.
 - Review Kenyan data-protection obligations and complete a provider/data-processing agreement before enabling identity verification.
 - Contact ownership verification and account recovery must be completed before launch.
 - Do not use the placeholder domain or example credentials in deployment.
