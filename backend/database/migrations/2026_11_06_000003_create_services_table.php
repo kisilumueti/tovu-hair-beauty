@@ -20,7 +20,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('duration_minutes');
             $table->unsignedSmallInteger('buffer_before_minutes')->default(0);
             $table->unsignedSmallInteger('buffer_after_minutes')->default(0);
-            $table->boolean('is_active')->default(true)->index();
+            $table->boolean('is_active')->default(false)->index();
             $table->boolean('requires_consultation')->default(false);
             $table->timestamps();
 
