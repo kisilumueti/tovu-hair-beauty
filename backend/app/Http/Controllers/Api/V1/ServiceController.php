@@ -17,6 +17,7 @@ class ServiceController extends Controller
     public function index(ProfessionalProfile $professional): JsonResponse
     {
         $services = Service::query()
+            ->with('teamMembers:id')
             ->where('professional_profile_id', $professional->id)
             ->whereHas('professionalProfile', fn ($query) => $query->where('verification_status', 'verified'))
             ->where('is_active', true)
@@ -66,7 +67,7 @@ class ServiceController extends Controller
 
         $this->audit($request, 'service.created', $service, ['professional_profile_id' => $profile->id]);
 
-        return response()->json(['data' => $this->payload($service->fresh())], 201);
+        return response()->json(['data' => $this->payload($service->fresh()->load('teamMembers:id'))], 201);
     }
 
     public function update(Request $request, Service $service): JsonResponse
@@ -96,7 +97,7 @@ class ServiceController extends Controller
 
         $this->audit($request, 'service.updated', $service, ['fields' => array_keys($data)]);
 
-        return response()->json(['data' => $this->payload($service->fresh())]);
+        return response()->json(['data' => $this->payload($service->fresh()->load('teamMembers:id'))]);
     }
 
     public function archive(Request $request, Service $service): JsonResponse
@@ -122,6 +123,12 @@ class ServiceController extends Controller
 
     private function validatedData(Request $request, bool $partial): array
     {
+        if ($partial && $request->all() === []) {
+            throw ValidationException::withMessages([
+                'service' => ['Provide at least one field to update.'],
+            ]);
+        }
+
         $required = $partial ? 'sometimes' : 'required';
 
         return $request->validate([
@@ -181,6 +188,7 @@ class ServiceController extends Controller
             'buffer_after_minutes' => $service->buffer_after_minutes,
             'is_active' => $service->is_active,
             'requires_consultation' => $service->requires_consultation,
+            'team_member_ids' => $service->teamMembers->pluck('id')->map(fn ($id): string => (string) $id)->values()->all(),
             'created_at' => $service->created_at?->toISOString(),
             'updated_at' => $service->updated_at?->toISOString(),
         ];
