@@ -15,8 +15,13 @@ Implemented in this milestone:
 - Identity verification attempts and audit events store provider metadata and status only; the raw National ID is not stored.
 - Request correlation IDs in the X-Request-ID response header.
 - Initial feature tests for customer and stylist registration and the unconfigured identity boundary.
+- Salon team invitations with expiring single-use tokens, SHA-256 token-hash storage, email delivery through configured SMTP, and owner-only team administration.
+- Team roles (manager, stylist, receptionist), membership suspension, and salon ownership checks.
+- Provider-owned service catalogues with integer minor-unit pricing, durations, buffers, active/archive status, and optional salon team assignment.
+- Public paginated service discovery and owner-scoped service create/update/archive endpoints.
+- Audit events for invitation and service/team changes.
 
-This is an incremental backend foundation, not a production-ready marketplace. Contact verification (email/phone OTP), salon teams, service catalogues, availability, booking transactions, cancellation, notifications, payments, operational hardening, and load testing remain roadmap items.
+This is an incremental backend foundation, not a production-ready marketplace. Contact verification (email/phone OTP), business hours, staff schedules, server-side availability, transactional booking, cancellation, booking notifications, payments, operational hardening, and load testing remain roadmap items.
 
 ## Requirements
 
@@ -42,7 +47,7 @@ php artisan migrate
 php artisan serve
 ```
 
-The API health endpoint is GET /up. The versioned API base path is /api/v1.
+The API health endpoint is GET /up. The versioned API base path is /api/v1. Configure a real SMTP relay before using salon invitations; the local environment template points to a development SMTP listener on port 1025.
 
 ## Authentication contract
 
@@ -88,6 +93,83 @@ POST /api/v1/professional/identity-verification (professional account only):
 
 The number above is a non-real format placeholder only; never use a real identity number in tests, tickets, screenshots, or source control. The current gateway is deliberately unconfigured and returns HTTP 503. It does not claim verification and does not retain the supplied number. Only an approved provider adapter may receive the number over TLS. Persist only the provider reference, verification status, consent-version identifier, and timestamps after the provider contract and privacy review are approved. Never log request bodies for this endpoint.
 
+
+## Salon teams and service catalogue
+
+All authenticated routes use Sanctum bearer tokens. A salon owner must have a salon account and its associated salon professional profile. A team invitee must register an independent stylist account using the exact invited email before accepting an invitation.
+
+### Salon team API
+
+| Method | Endpoint | Access | Purpose |
+|---|---|---|---|
+| GET | /api/v1/salon/team | Salon owner | List team members |
+| POST | /api/v1/salon/team/invitations | Salon owner | Invite a team member by email |
+| POST | /api/v1/salon/team/invitations/accept | Stylist | Accept a matching invitation |
+| PATCH | /api/v1/salon/team/{member}/role | Salon owner | Change manager/stylist/receptionist role |
+| DELETE | /api/v1/salon/team/{member} | Salon owner | Suspend team access |
+
+Invitation request:
+
+~~~json
+{
+  "email": "stylist@example.test",
+  "role": "stylist"
+}
+~~~
+
+Invitations expire after 72 hours. A cryptographically random token is emailed to the invitee; only its SHA-256 hash is stored. The API response never returns the raw token. Invitation creation returns HTTP 503 and creates no invitation when MAIL_MAILER is not smtp or delivery fails. Do not switch the mailer to log in an environment where invitations are enabled because invitation links are credentials.
+
+The invitation link targets FRONTEND_URL/team/invitations/accept?token=... . The React route that consumes this link still needs to be implemented before the invitation journey is complete. The invitee must authenticate as a stylist and submit the token to the acceptance endpoint.
+
+### Service catalogue API
+
+| Method | Endpoint | Access | Purpose |
+|---|---|---|---|
+| GET | /api/v1/professionals/{professionalProfileId}/services | Public | Paginated active services |
+| POST | /api/v1/professional/services | Stylist or salon owner | Create service |
+| PATCH | /api/v1/professional/services/{serviceId} | Owning professional | Update service |
+| DELETE | /api/v1/professional/services/{serviceId} | Owning professional | Archive service |
+
+Create request:
+
+~~~json
+{
+  "name": "Protective braids",
+  "category": "Braids",
+  "description": "A professional protective styling appointment.",
+  "price_minor": 250000,
+  "duration_minutes": 120,
+  "buffer_before_minutes": 10,
+  "buffer_after_minutes": 15,
+  "is_active": true,
+  "requires_consultation": false,
+  "team_member_ids": []
+}
+~~~
+
+price_minor is an integer in the smallest unit of the selected currency. For KES, 250000 represents KES 2,500.00. The API currently accepts KES only. The frontend should convert the integer to its display amount by dividing by 100; never use floating-point arithmetic for server-side money calculations. Salon services may optionally list active team member IDs. Every assigned member must belong to the owning salon. Independent stylist services cannot have team assignments.
+
+A DELETE request archives the service by setting is_active=false; it does not physically delete historical service data. Public discovery returns active services only and uses page-based pagination (50 records per page).
+
+### SMTP configuration
+
+Set these variables in the backend runtime environment using credentials from an approved mail provider:
+
+~~~env
+MAIL_MAILER=smtp
+MAIL_SCHEME=smtp
+MAIL_HOST=your-smtp-host
+MAIL_PORT=587
+MAIL_USERNAME=your-smtp-username
+MAIL_PASSWORD=your-smtp-password
+MAIL_FROM_ADDRESS=no-reply@your-owned-domain
+MAIL_FROM_NAME="TOVU"
+FRONTEND_URL=https://your-frontend-domain
+~~~
+
+Use TLS as required by the provider (typically port 587 with SMTP STARTTLS or port 465 with SMTPS). Store credentials in the deployment secret manager, not in .env.example, CI YAML, or source control. Verify SPF, DKIM, and DMARC for the sender domain before production email delivery.
+
+
 ## Frontend integration
 
 The current React preview uses browser-local JSON state and email lookup; it is not yet connected to this API. Configure the frontend public environment variable after the API is deployed:
@@ -111,9 +193,9 @@ The frontend adapter must map API user and professional profile fields to the ex
 
 ## Next backend milestones
 
-1. Salon ownership, team invitations, staff roles, and service catalogue management.
-2. Business hours, staff schedules, time off, and server-side availability.
-3. Transactional booking creation with a per-professional/day lock and overlap checks in MySQL.
-4. Customer booking history, provider decisions, cancellation rules, and audit events.
-5. Notification queue and delivery adapters; payment provider boundary and reconciliation.
-6. Expanded authorization, abuse controls, integration tests, CI dependency lock, deployment runbooks, observability, backups, and load testing.
+1. Business hours, staff schedules, time off, and server-side availability for independent stylists and salon team members.
+2. Transactional booking creation with MySQL conflict prevention, booking history, cancellation rules, and audit events.
+3. Booking lifecycle notifications, durable queue configuration, retry policies, and delivery monitoring.
+4. Payment-provider contract, webhook signature validation, idempotency, and reconciliation without storing card data.
+5. Frontend API adapter and invitation acceptance route; contact verification and account recovery.
+6. Expanded authorization, integration tests, dependency lock, deployment runbooks, observability, backups, and load testing.
