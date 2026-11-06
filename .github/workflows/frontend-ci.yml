@@ -3,8 +3,26 @@ name: Frontend quality checks
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "index.html"
+      - "*.json"
+      - "*.ts"
+      - "*.tsx"
+      - "*.css"
+      - "vite.config.ts"
+      - ".github/workflows/frontend-ci.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "src/**"
+      - "index.html"
+      - "*.json"
+      - "*.ts"
+      - "*.tsx"
+      - "*.css"
+      - "vite.config.ts"
+      - ".github/workflows/frontend-ci.yml"
 
 jobs:
   build:
