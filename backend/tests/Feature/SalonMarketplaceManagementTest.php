@@ -19,7 +19,7 @@ class SalonMarketplaceManagementTest extends TestCase
 
     public function test_salon_owner_can_create_a_service_and_publish_it_to_the_public_catalogue(): void
     {
-        [$owner, $salon] = $this->createProfessional(User::ROLE_SALON, 'owner@example.test');
+        [$owner, $salon] = $this->createProfessional(User::ROLE_SALON, 'owner@example.test', 'verified');
 
         $response = $this->actingAs($owner)->postJson('/api/v1/professional/services', [
             'name' => 'Protective braids',
@@ -48,6 +48,22 @@ class SalonMarketplaceManagementTest extends TestCase
         $this->getJson('/api/v1/professionals/'.$salon->id.'/services')
             ->assertOk()
             ->assertJsonPath('data.0.name', 'Protective braids');
+    }
+
+    public function test_pending_professional_cannot_publish_a_service(): void
+    {
+        [$owner] = $this->createProfessional(User::ROLE_STYLIST, 'pending-publisher@example.test');
+
+        $this->actingAs($owner)->postJson('/api/v1/professional/services', [
+            'name' => 'Pending service',
+            'category' => 'Hair',
+            'price_minor' => 50000,
+            'duration_minutes' => 60,
+            'is_active' => true,
+        ])->assertUnprocessable()
+          ->assertJsonValidationErrors(['is_active']);
+
+        $this->assertDatabaseCount('services', 0);
     }
 
     public function test_professional_cannot_modify_another_professionals_service(): void
@@ -167,7 +183,7 @@ class SalonMarketplaceManagementTest extends TestCase
      *
      * @return array{User, ProfessionalProfile}
      */
-    private function createProfessional(string $role, string $email): array
+    private function createProfessional(string $role, string $email, string $verificationStatus = 'pending'): array
     {
         $user = User::query()->create([
             'name' => 'Synthetic '.$role,
@@ -182,7 +198,7 @@ class SalonMarketplaceManagementTest extends TestCase
             'type' => $role,
             'business_name' => 'Synthetic '.$role.' profile',
             'location' => 'Nairobi',
-            'verification_status' => 'pending',
+            'verification_status' => $verificationStatus,
         ]);
 
         return [$user, $profile];
