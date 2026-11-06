@@ -82,11 +82,9 @@ function App() {
     const email = String(form.get('email')).trim().toLowerCase();
     const phone = String(form.get('phone')).trim();
     const location = String(form.get('location')).trim();
-    const nationalId = String(form.get('nationalId') ?? '').trim();
 
     if (!name || !email || !phone || !location) { setError('Complete all required fields.'); return; }
     if (db.customers.some((customer) => customer.email === email)) { setError('An account with this email already exists in this browser.'); return; }
-    if (role !== 'customer' && !/^\d{7,8}$/.test(nationalId)) { setError('Enter a valid 7–8 digit Kenyan National ID number.'); return; }
 
     const id = createId(role);
     const customer: Customer = { id, name, email, phone, location, role, createdAt: new Date().toISOString() };
@@ -238,7 +236,7 @@ function App() {
           {currentUser && currentUser.role !== 'customer' && <button className={page === 'dashboard' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('dashboard')}>Business studio</button>}
         </nav>
         <div className="header-controls">
-          {currentUser ? <button className="profile-chip" onClick={() => navigate(currentUser.role === 'customer' ? 'bookings' : 'dashboard')}><span className="profile-avatar">{currentUser.name.slice(0, 1).toUpperCase()}</span><span>{currentUser.name.split(' ')[0]}</span><ChevronDown size={14} /></button><button className="button button-quiet signout-button" onClick={signOut} title="Sign out"><LogOut size={14} /></button> : <button className="button button-quiet" onClick={() => { setModal('account'); setShowRegister(true); }}>Sign in / Join</button>}
+          {currentUser ? <><button className="profile-chip" onClick={() => navigate(currentUser.role === 'customer' ? 'bookings' : 'dashboard')}><span className="profile-avatar">{currentUser.name.slice(0, 1).toUpperCase()}</span><span>{currentUser.name.split(' ')[0]}</span><ChevronDown size={14} /></button><button className="button button-quiet signout-button" onClick={signOut} title="Sign out"><LogOut size={14} /></button></> : <button className="button button-quiet" onClick={() => { setModal('account'); setShowRegister(true); }}>Sign in / Join</button>}
           <button className="button button-ink header-join" onClick={() => { setModal('account'); setShowRegister(true); }}>Join TOVU <ArrowUpRight size={15} /></button>
         </div>
         <button className="mobile-menu-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation">{mobileMenu ? <X /> : <Menu />}</button>
@@ -347,7 +345,7 @@ function App() {
           <div className="form-two"><label>PHONE NUMBER<input name="phone" type="tel" required placeholder="+254 7XX XXX XXX" /></label><label>LOCATION<input name="location" required placeholder="Town / neighbourhood" /></label></div>
           <label>BUSINESS / STUDIO NAME <span className="optional-label">For professionals</span><input name="businessName" placeholder="Your salon or studio name" /></label>
           <label>ABOUT YOUR WORK <span className="optional-label">For professionals</span><textarea name="bio" rows={3} placeholder="Tell customers about your services and experience." /></label>
-          <label>NATIONAL ID NUMBER <span className="required-label">Required for stylist and salon registration</span><input name="nationalId" inputMode="numeric" pattern="[0-9]{7,8}" maxLength={8} placeholder="7–8 digit Kenyan ID number" /><small className="field-help">The number is checked for format and immediately discarded. It is not saved. This preview does not verify identity or qualifications.</small></label>
+          {role !== 'customer' && <div className="form-callout"><ShieldCheck size={18} /><span>Identity verification is not enabled in this preview. TOVU will request identity details only through an approved verification provider after the required privacy and consent arrangements are in place.</span></div>}
           {error && <p className="form-error">{error}</p>}
           <button className="button button-ink button-full" type="submit">Create local profile <ArrowRight size={16} /></button>
           <p className="form-footnote">By continuing, you understand this is a browser-based product preview, not a live identity or authentication service.</p>
