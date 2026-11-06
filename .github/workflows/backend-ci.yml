@@ -67,7 +67,7 @@ jobs:
           DB_USERNAME: tovu
           DB_PASSWORD: tovu
       - name: Run feature tests
-        run: php artisan test
+        run: vendor/bin/phpunit
         env:
           DB_CONNECTION: sqlite
           DB_DATABASE: ":memory:"
