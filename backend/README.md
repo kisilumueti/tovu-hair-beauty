@@ -49,6 +49,7 @@ Create a MySQL database and a least-privilege application user, then configure D
 
 ```bash
 php artisan migrate
+composer test
 php artisan serve
 ```
 
@@ -185,12 +186,44 @@ VITE_API_BASE_URL=https://api.example.invalid/api/v1
 
 The frontend adapter must map API user and professional profile fields to the existing Customer and Professional view models. Do not treat the current local profile ID or local booking records as server identities. A dedicated migration/adapter step is required before enabling live customer registration or booking in the UI.
 
+
+## Cache and queue scaling
+
+The backend configuration supports Redis-backed cache and queues while retaining file/sync defaults for local development. The database queue tables and failed-job table are included for environments that intentionally choose the database queue.
+
+For a horizontally scaled deployment, install and enable the PHP Redis extension (phpredis) and set the following runtime variables through the secret manager:
+
+~~~env
+CACHE_STORE=redis
+QUEUE_CONNECTION=redis
+REDIS_CLIENT=phpredis
+REDIS_HOST=your-private-redis-host
+REDIS_PORT=6379
+REDIS_USERNAME=
+REDIS_PASSWORD=your-managed-redis-password
+REDIS_DB=0
+REDIS_CACHE_DB=1
+REDIS_QUEUE=default
+REDIS_QUEUE_RETRY_AFTER=90
+~~~
+
+Keep Redis on a private network, require authentication/TLS where supported, and do not expose it publicly. Use separate logical Redis databases for application cache and queue data. Queue connections use after-commit semantics so jobs are not published before their database transaction commits.
+
+Run a supervised worker process in each application environment:
+
+~~~bash
+php artisan queue:work redis --queue=default --sleep=1 --tries=3 --timeout=60
+~~~
+
+Use Supervisor, systemd, or an orchestrator to restart workers and gracefully terminate them during deployments. Monitor queue depth, failed jobs, worker memory, latency, and retry rates. Team invitation email is currently sent synchronously so a failed SMTP delivery can roll back invitation creation; future booking notifications should use the durable queue.
+
+
 ## Security and operations
 
 - Keep .env, database credentials, app keys, provider credentials, tokens, and all personal data out of Git.
 - Use HTTPS, a dedicated MySQL user, managed secrets, encrypted backups, least privilege, and restricted database/network access.
 - Set APP_DEBUG=false in every shared environment.
-- Configure a shared Redis cache and durable queue before running multiple application instances. The current file cache is not a cross-instance rate-limit store; use Redis for horizontally scaled production deployments.
+- Configure the Redis cache and queue drivers before running multiple application instances. The current local defaults (file cache and sync queue) are not cross-instance rate-limit or background-job infrastructure; use Redis for horizontally scaled production deployments.
 - Review Kenyan data-protection obligations and complete a provider/data-processing agreement before enabling identity verification.
 - Contact ownership verification and account recovery must be completed before launch.
 - Do not use the placeholder domain or example credentials in deployment.
