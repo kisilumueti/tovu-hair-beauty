@@ -56,6 +56,13 @@ class SalonTeamController extends Controller
             ])],
         ]);
 
+        if (config('mail.default') !== 'smtp') {
+            return response()->json([
+                'message' => 'Salon invitations require a configured SMTP mail transport. The invitation was not created.',
+                'request_id' => $request->attributes->get('request_id'),
+            ], 503);
+        }
+
         $email = mb_strtolower(trim($data['email']));
         $existingMember = SalonTeamMember::query()
             ->where('salon_profile_id', $salon->id)
