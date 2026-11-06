@@ -29,4 +29,19 @@ class ProfessionalProfile extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    public function services(): HasMany
+    {
+        return $this->hasMany(Service::class);
+    }
+
+    public function teamMembers(): HasMany
+    {
+        return $this->hasMany(SalonTeamMember::class, 'salon_profile_id');
+    }
+
+    public function teamInvitations(): HasMany
+    {
+        return $this->hasMany(SalonTeamInvitation::class, 'salon_profile_id');
+    }
 }
