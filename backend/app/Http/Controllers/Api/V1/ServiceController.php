@@ -18,6 +18,7 @@ class ServiceController extends Controller
     {
         $services = Service::query()
             ->where('professional_profile_id', $professional->id)
+            ->whereHas('professionalProfile', fn ($query) => $query->where('verification_status', 'verified'))
             ->where('is_active', true)
             ->orderBy('category')
             ->orderBy('name')
@@ -40,6 +41,14 @@ class ServiceController extends Controller
         $data = $this->validatedData($request, false);
         $teamMemberIds = $data['team_member_ids'] ?? [];
         unset($data['team_member_ids']);
+        $isActive = (bool) ($data['is_active'] ?? false);
+        unset($data['is_active']);
+
+        if ($isActive && $profile->verification_status !== 'verified') {
+            throw ValidationException::withMessages([
+                'is_active' => ['Professional identity verification must be complete before a service can be published.'],
+            ]);
+        }
 
         $this->assertTeamAssignments($profile, $teamMemberIds);
 
@@ -48,6 +57,7 @@ class ServiceController extends Controller
             'professional_profile_id' => $profile->id,
             'slug' => Str::slug($data['name']).'-'.Str::lower(Str::random(6)),
             'currency' => 'KES',
+            'is_active' => $isActive,
         ]);
 
         if ($teamMemberIds !== []) {
@@ -70,6 +80,12 @@ class ServiceController extends Controller
 
         if ($teamMemberIds !== null) {
             $this->assertTeamAssignments($profile, $teamMemberIds);
+        }
+
+        if (($data['is_active'] ?? false) && $profile->verification_status !== 'verified') {
+            throw ValidationException::withMessages([
+                'is_active' => ['Professional identity verification must be complete before a service can be published.'],
+            ]);
         }
 
         $service->fill($data)->save();
@@ -138,6 +154,7 @@ class ServiceController extends Controller
         $count = SalonTeamMember::query()
             ->where('salon_profile_id', $profile->id)
             ->where('status', 'active')
+            ->whereHas('user.professionalProfile', fn ($query) => $query->where('verification_status', 'verified'))
             ->whereIn('id', $teamMemberIds)
             ->count();
 
