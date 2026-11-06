@@ -345,7 +345,7 @@ function App() {
           <div className="form-two"><label>PHONE NUMBER<input name="phone" type="tel" required placeholder="+254 7XX XXX XXX" /></label><label>LOCATION<input name="location" required placeholder="Town / neighbourhood" /></label></div>
           <label>BUSINESS / STUDIO NAME <span className="optional-label">For professionals</span><input name="businessName" placeholder="Your salon or studio name" /></label>
           <label>ABOUT YOUR WORK <span className="optional-label">For professionals</span><textarea name="bio" rows={3} placeholder="Tell customers about your services and experience." /></label>
-          {role !== 'customer' && <div className="form-callout"><ShieldCheck size={18} /><span>Identity verification is not enabled in this preview. TOVU will request identity details only through an approved verification provider after the required privacy and consent arrangements are in place.</span></div>}
+          <div className="form-callout"><ShieldCheck size={18} /><span>Professional identity verification is not enabled in this preview. TOVU will request identity details only through an approved verification provider after the required privacy and consent arrangements are in place.</span></div>
           {error && <p className="form-error">{error}</p>}
           <button className="button button-ink button-full" type="submit">Create local profile <ArrowRight size={16} /></button>
           <p className="form-footnote">By continuing, you understand this is a browser-based product preview, not a live identity or authentication service.</p>
